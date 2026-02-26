@@ -1,0 +1,33 @@
+name: Smoke - Pull platform contract
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oras-project/setup-oras@v1
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Pull platform contract by digest
+        run: |
+          set -euo pipefail
+          REF="ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:8b9763b2b4b19d0ddc38b131645fb5bd3a080c8440f65619a03793f8f812bb69"
+          rm -rf /tmp/platform-contract
+          mkdir -p /tmp/platform-contract
+          oras pull "${REF}" -o /tmp/platform-contract
+
+          echo "Downloaded files:"
+          find /tmp/platform-contract -maxdepth 3 -type f -print
+
+          echo "List tar contents:"
+          tar -tzf /tmp/platform-contract/dist/platform-contract.tar.gz | head -n 50

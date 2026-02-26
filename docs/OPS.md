@@ -70,8 +70,8 @@ Good looks like verification after NVMe boot remains the same as below in **Firs
 1) Clone the repo (with submodules):
 
 ```bash
-git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox-rpi.git
-cd img-ourbox-matchbox-rpi
+git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox.git
+cd img-ourbox-matchbox
 ```
 
 2. Run the end-to-end operator script:
@@ -135,9 +135,40 @@ sudo cat /var/lib/ourbox/state/bootstrap.done 2>/dev/null || true
 
 ---
 
-## Registry distribution (optional, no copy/paste refs)
+## Platform contract provenance (what baseline did this image ship?)
 
-If you want to publish the OS image into the registry (per ADR-0003), do:
+This image repo is responsible for "boot + bootstrap," but the *platform contract* (baseline
+manifests / platform components contract) is sourced from `sw-ourbox-os`.
+
+When debugging a device, the first question is:
+
+> "What platform contract revision/digest am I running?"
+
+Check:
+
+```bash
+sudo cat /etc/ourbox/release
+```
+
+Look for the `OURBOX_PLATFORM_CONTRACT_*` keys:
+- `OURBOX_PLATFORM_CONTRACT_SOURCE`
+- `OURBOX_PLATFORM_CONTRACT_REVISION`
+- (when available) `OURBOX_PLATFORM_CONTRACT_VERSION`
+- (when available) `OURBOX_PLATFORM_CONTRACT_DIGEST`
+
+This is the provenance boundary that keeps "official baseline" legible even before we enforce
+signatures.
+
+---
+
+## OCI distribution of the OS image (optional, transport only)
+
+Publishing the flashable OS image into a registry is optional (per ADR-0003). This is *transport*
+for the OS image bytes — it is not the source of truth for the platform contract.
+
+If you publish/pull via OCI, prefer digest identity for repeatability (tags are convenience).
+
+To publish:
 
 ```bash
 ./tools/publish-os-artifact.sh deploy
