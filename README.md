@@ -1,4 +1,4 @@
-# img-ourbox-matchbox-rpi
+# img-ourbox-matchbox
 
 Build repository for **OurBox Matchbox** OS images targeting **Raspberry Pi hardware** (Pi 5 + dual NVMe, Matchbox-class hardware).
 
@@ -21,8 +21,8 @@ Model identifies the physical hardware class; SKU identifies the exact bill-of-m
 
 ```bash
 cd ~
-git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox-rpi.git
-cd img-ourbox-matchbox-rpi
+git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox.git
+cd img-ourbox-matchbox
 ./tools/prepare-installer-media.sh
 # move media to Pi, boot, follow prompts, device powers off, remove media, boot NVMe
 ```

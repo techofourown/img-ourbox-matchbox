@@ -26,7 +26,7 @@ BLOG="${DEPLOY_DIR}/build.log"
 
 # Where it will live in the registry
 # Example:
-#   registry.benac.dev/ourbox/os:img-ourbox-matchbox-rpi-too-obx-mbx-base-001-dev-dev
+#   registry.benac.dev/ourbox/os:img-ourbox-matchbox-too-obx-mbx-base-001-dev-dev
 IMAGE="$(imgref os "${BASE}")"
 
 tmp="$(mktemp -d)"

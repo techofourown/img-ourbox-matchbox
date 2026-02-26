@@ -70,8 +70,8 @@ Good looks like verification after NVMe boot remains the same as below in **Firs
 1) Clone the repo (with submodules):
 
 ```bash
-git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox-rpi.git
-cd img-ourbox-matchbox-rpi
+git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox.git
+cd img-ourbox-matchbox
 ```
 
 2. Run the end-to-end operator script:
