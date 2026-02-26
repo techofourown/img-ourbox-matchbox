@@ -47,3 +47,27 @@ This is implemented by:
 ### Mitigation
 - Keep SCP/USB as a documented fallback
 - Keep metadata alongside the image (`os.info`, `build.log`)
+
+---
+
+## Notes (2026-02-26)
+
+This ADR is about **transporting flashable OS image bytes** (`os.img.xz`) using OCI registry
+mechanics. It is compatible with the org-wide OCI posture, but it is intentionally narrower:
+
+- It does **not** decide how apps are distributed (org ADR-0007).
+- It does **not** define the OurBox OS **platform contract** (baseline manifests / platform
+  components contract). Platform contract provenance and consumption are handled by ADR-0004 and the
+  upstream `sw-ourbox-os` documentation.
+
+---
+
+## References
+
+- Org ADR-0007 (OCI substrate for apps + platform components):
+  https://github.com/techofourown/org-techofourown/blob/main/docs/decisions/ADR-0007-adopt-oci-artifacts-for-app-distribution.md
+- `sw-ourbox-os` ADR-0009 (platform contract as OCI artifact):
+  https://github.com/techofourown/sw-ourbox-os/blob/main/docs/decisions/ADR-0009-package-the-platform-contract-as-an-oci-artifact.md
+- `sw-ourbox-os` integration reference (artifact distribution + integration contract):
+  https://github.com/techofourown/sw-ourbox-os/blob/main/docs/architecture/artifact-distribution-and-integration.md
+- ADR-0004 (this repo): Consume platform contract from `sw-ourbox-os`

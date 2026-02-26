@@ -20,6 +20,28 @@ Line-oriented `KEY=VALUE` pairs (shell-friendly). Example keys:
 - `OURBOX_VARIANT`
 - `OURBOX_VERSION`
 - `OURBOX_RECIPE_GIT_HASH` (recommended)
+- `OURBOX_PLATFORM_CONTRACT_SOURCE` (required — see below)
+- `OURBOX_PLATFORM_CONTRACT_REVISION` (required — see below)
+- `OURBOX_PLATFORM_CONTRACT_VERSION` (optional, when known)
+- `OURBOX_PLATFORM_CONTRACT_DIGEST` (optional, when OCI packaging exists)
+
+### Platform contract provenance (normative)
+
+Matchbox images MUST record the upstream OurBox OS platform contract provenance so operators can
+answer:
+
+- "Which platform baseline did this image ship?"
+- "What upstream revision/digest does it correspond to?"
+
+Minimum requirement (Phase 0+):
+- `OURBOX_PLATFORM_CONTRACT_SOURCE`
+- `OURBOX_PLATFORM_CONTRACT_REVISION`
+
+When available, prefer also recording:
+- `OURBOX_PLATFORM_CONTRACT_VERSION`
+- `OURBOX_PLATFORM_CONTRACT_DIGEST`
+
+See `docs/reference/platform-contract.md` for the full provenance model and vendoring workflow.
 
 ### Why it exists
 
@@ -107,3 +129,4 @@ Long-term intent: bake this into the image during build.
 
 * ADR-0002: Storage contract (mount data by label)
 * ADR-0003: OS artifact distribution via OCI registry
+* ADR-0004: Consume platform contract from `sw-ourbox-os` (provenance + allocation)
