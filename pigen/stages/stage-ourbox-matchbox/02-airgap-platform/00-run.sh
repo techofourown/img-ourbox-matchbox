@@ -80,3 +80,24 @@ install -m 0644 \
 
 echo "==> Installing platform manifests + systemd units + bootstrap script"
 cp -a "${SCRIPT_DIR}/files/." "${ROOTFS_DIR}/"
+
+echo "==> Recording platform contract metadata in /etc/ourbox/release"
+RELEASE_FILE="${ROOTFS_DIR}/etc/ourbox/release"
+CONTRACT_ENV="${ROOTFS_DIR}/opt/ourbox/airgap/platform/contract.env"
+CONTRACT_DIGEST_FILE="${ROOTFS_DIR}/opt/ourbox/airgap/platform/contract.digest"
+
+[[ -f "${RELEASE_FILE}" ]] || { echo "ERROR: missing ${RELEASE_FILE}" >&2; exit 1; }
+[[ -f "${CONTRACT_ENV}" ]] || { echo "ERROR: missing ${CONTRACT_ENV} (did you sync the platform contract?)" >&2; exit 1; }
+[[ -f "${CONTRACT_DIGEST_FILE}" ]] || { echo "ERROR: missing ${CONTRACT_DIGEST_FILE} (did you sync the platform contract?)" >&2; exit 1; }
+
+# Append contract.env contents (which contains OURBOX_PLATFORM_CONTRACT_* keys)
+# shellcheck disable=SC1090
+source "${CONTRACT_ENV}"
+
+{
+  echo "OURBOX_PLATFORM_CONTRACT_DIGEST=$(cat "${CONTRACT_DIGEST_FILE}")"
+  echo "OURBOX_PLATFORM_CONTRACT_SOURCE=${OURBOX_PLATFORM_CONTRACT_SOURCE:-unknown}"
+  echo "OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}"
+  echo "OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}"
+  echo "OURBOX_PLATFORM_CONTRACT_CREATED=${OURBOX_PLATFORM_CONTRACT_CREATED:-unknown}"
+} >> "${RELEASE_FILE}"

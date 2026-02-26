@@ -21,7 +21,7 @@ jobs:
       - name: Pull platform contract by digest
         run: |
           set -euo pipefail
-          REF="ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:8b9763b2b4b19d0ddc38b131645fb5bd3a080c8440f65619a03793f8f812bb69"
+          REF="$(cat contracts/platform-contract.ref)"
           rm -rf /tmp/platform-contract
           mkdir -p /tmp/platform-contract
           oras pull "${REF}" -o /tmp/platform-contract

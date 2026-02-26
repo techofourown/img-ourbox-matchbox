@@ -20,6 +20,7 @@ if [[ -f "${VERSIONS_ENV}" ]]; then
 fi
 
 : "${BUILDKIT_VERSION:=v0.23.2}"
+: "${ORAS_VERSION:=1.3.0}"
 
 pkg_install_apt() {
   export DEBIAN_FRONTEND=noninteractive
@@ -123,6 +124,33 @@ install_buildkit() {
   /usr/local/bin/buildctl  --version
 }
 
+install_oras() {
+  local arch url tmpdir
+  arch="$(map_arch)" # returns amd64 or arm64
+  url="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${arch}.tar.gz"
+
+  if command -v oras >/dev/null 2>&1; then
+    local current
+    current="$(oras version 2>/dev/null || true)"
+    if echo "${current}" | grep -q "Version: *${ORAS_VERSION}"; then
+      log "ORAS already installed (${current}); skipping"
+      return
+    fi
+    log "ORAS present but not v${ORAS_VERSION}; upgrading"
+  else
+    log "Installing ORAS v${ORAS_VERSION}"
+  fi
+
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf '"'"'"'${tmpdir}'"'"'"'' EXIT
+
+  curl -fsSL -o "${tmpdir}/oras.tgz" "${url}"
+  tar -C "${tmpdir}" -xzf "${tmpdir}/oras.tgz" oras
+  install -m 0755 "${tmpdir}/oras" /usr/local/bin/oras
+
+  log "ORAS installed: $(oras version || true)"
+}
+
 configure_buildkit_service_systemd() {
   # Optional but helpful: keep buildkitd available as a daemon.
   # We only do this if systemd is present.
@@ -171,6 +199,7 @@ main() {
   log "Bootstrapping host dependencies (Podman + BuildKit + basics)"
   install_packages
   install_buildkit
+  install_oras
   configure_buildkit_service_systemd
   verify_tools
 

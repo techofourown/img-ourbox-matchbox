@@ -21,39 +21,31 @@ The platform contract (baseline manifests + platform components contract) is def
 - `sw-ourbox-os` integration reference:
   https://github.com/techofourown/sw-ourbox-os/blob/main/docs/architecture/artifact-distribution-and-integration.md
 
+- Pinned digest in this repo: `contracts/platform-contract.ref` (update this file when bumping)
+
 This repo is a **consumer**.
 
 ---
 
-## Current state (Phase 0): vendored baseline manifests inside the image
+## Current state: consume OCI artifact by pinned digest
 
-Today, Matchbox images embed an airgap platform directory under:
-
-- `/opt/ourbox/airgap/platform/`
-
-In this repo, that content is staged via pi-gen under:
-
-- `pigen/stages/stage-ourbox-matchbox/02-airgap-platform/files/opt/ourbox/airgap/platform/`
-
-This is allowed during Phase 0, but it must be treated as an **upstream platform contract snapshot**
-— not as a freehand "platform policy playground."
+Matchbox fetches the upstream `platform-contract` OCI artifact pinned by digest from GHCR (see
+`contracts/platform-contract.ref`), extracts it with `./tools/fetch-platform-contract.sh`, and
+syncs it into the pi-gen stage via `./tools/sync-platform-contract-into-pigen.sh`. The airgap
+platform directory at `/opt/ourbox/airgap/platform/` is populated from this artifact during build,
+not from vendored YAML.
 
 ---
 
 ## Required provenance recording
 
-Because Phase 0 vendoring can drift, we require an explicit provenance boundary.
+The installed system records platform contract provenance in `/etc/ourbox/release` after the
+platform contract has been staged into the rootfs. Keys appended include:
 
-The installed system MUST record platform contract provenance in:
-
-- `/etc/ourbox/release`
-
-Required keys:
 - `OURBOX_PLATFORM_CONTRACT_SOURCE`
 - `OURBOX_PLATFORM_CONTRACT_REVISION`
-
-Optional keys (when available):
 - `OURBOX_PLATFORM_CONTRACT_VERSION`
+- `OURBOX_PLATFORM_CONTRACT_CREATED`
 - `OURBOX_PLATFORM_CONTRACT_DIGEST`
 
 See also: `docs/reference/contracts.md`.

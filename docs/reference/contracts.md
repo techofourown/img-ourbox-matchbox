@@ -23,6 +23,7 @@ Line-oriented `KEY=VALUE` pairs (shell-friendly). Example keys:
 - `OURBOX_PLATFORM_CONTRACT_SOURCE` (required — see below)
 - `OURBOX_PLATFORM_CONTRACT_REVISION` (required — see below)
 - `OURBOX_PLATFORM_CONTRACT_VERSION` (optional, when known)
+- `OURBOX_PLATFORM_CONTRACT_CREATED` (optional, when known)
 - `OURBOX_PLATFORM_CONTRACT_DIGEST` (optional, when OCI packaging exists)
 
 ### Platform contract provenance (normative)
@@ -39,9 +40,10 @@ Minimum requirement (Phase 0+):
 
 When available, prefer also recording:
 - `OURBOX_PLATFORM_CONTRACT_VERSION`
+- `OURBOX_PLATFORM_CONTRACT_CREATED`
 - `OURBOX_PLATFORM_CONTRACT_DIGEST`
 
-See `docs/reference/platform-contract.md` for the full provenance model and vendoring workflow.
+See `docs/reference/platform-contract.md` for the full provenance model and artifact workflow.
 
 ### Why it exists
 

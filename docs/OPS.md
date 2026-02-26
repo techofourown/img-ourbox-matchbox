@@ -84,7 +84,7 @@ That script will:
 
 * install Podman + BuildKit + required host tools (idempotent)
 * enforce pinned versions from `tools/versions.env` (no “latest”)
-* fetch the airgap artifacts
+* fetch the airgap artifacts (including the pinned platform contract)
 * build the OS image
 * scan for NVMe disks and refuse to proceed unless there are exactly two
 * protect the DATA disk (label `OURBOX_DATA`) and pick the other NVMe as SYSTEM

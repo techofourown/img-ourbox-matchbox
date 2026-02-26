@@ -1,0 +1,10 @@
+# Generated from the pinned platform contract
+landing/*
+manifests/*
+contract.env
+contract.digest
+
+# Keep the markers/docs
+!README.md
+!landing/.gitkeep
+!manifests/.gitkeep

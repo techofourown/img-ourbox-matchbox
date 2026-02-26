@@ -12,6 +12,7 @@ source "${ROOT}/tools/registry.sh"
 need_cmd curl
 need_cmd chmod
 need_cmd sed
+need_cmd oras
 
 # Always operate from repo root so relative paths (artifacts/) are stable
 cd "${ROOT}"
@@ -201,3 +202,9 @@ EOF_MANIFEST
 
 log "Artifacts created:"
 ls -lah "$OUT/k3s" "$OUT/platform/images" "$OUT/platform/todo-bloom" "$OUT/manifest.env"
+
+log "Fetching pinned platform contract (OCI artifact)"
+"${ROOT}/tools/fetch-platform-contract.sh"
+
+log "Syncing pinned platform contract into pi-gen stage files"
+"${ROOT}/tools/sync-platform-contract-into-pigen.sh"
