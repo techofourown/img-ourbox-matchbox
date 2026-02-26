@@ -92,8 +92,9 @@ CONTRACT_DIGEST_FILE="${ROOTFS_DIR}/opt/ourbox/airgap/platform/contract.digest"
 
 # Remove any existing contract lines to avoid duplicates on reruns
 tmp_release="$(mktemp)"
-grep -v '^OURBOX_PLATFORM_CONTRACT_' "${RELEASE_FILE}" > "${tmp_release}"
-mv "${tmp_release}" "${RELEASE_FILE}"
+grep -v '^OURBOX_PLATFORM_CONTRACT_' "${RELEASE_FILE}" > "${tmp_release}" || true
+cat "${tmp_release}" > "${RELEASE_FILE}"
+rm -f "${tmp_release}"
 
 CONTRACT_SOURCE="unknown"
 CONTRACT_REVISION="unknown"
