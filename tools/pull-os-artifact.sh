@@ -4,51 +4,50 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/tools/lib.sh"
-# shellcheck disable=SC1091
-source "${ROOT}/tools/registry.sh"
 
-CLI="$(pick_container_cli)"
+need_cmd oras
+: "${OS_REGISTRY_USERNAME:=}"
+: "${OS_REGISTRY_PASSWORD:=}"
+need_cmd sha256sum
+: "${OS_REGISTRY_USERNAME:=}"
+: "${OS_REGISTRY_PASSWORD:=}"
+
+maybe_login() {
+  if [[ -n "${OS_REGISTRY_USERNAME}" ]]; then
+    local registry="${REF%%/*}"
+    log "Logging into ${registry} for pull"
+    oras login "${registry}" -u "${OS_REGISTRY_USERNAME}" --password "${OS_REGISTRY_PASSWORD:-}"
+  fi
+}
 
 if [[ "${1:-}" == "--latest" ]]; then
   shift
   OUTDIR="${1:-deploy-from-registry}"
-
   REF_FILE="${ROOT}/deploy/os-artifact.ref"
-  if [[ -f "${REF_FILE}" ]]; then
-    IMAGE="$(cat "${REF_FILE}")"
-  else
-    die "${REF_FILE} not found. Run ./tools/publish-os-artifact.sh deploy first, or pass IMAGE_REF explicitly."
-  fi
+  [[ -f "${REF_FILE}" ]] || die "${REF_FILE} not found. Run ./tools/publish-os-artifact.sh deploy first, or pass IMAGE_REF explicitly."
+  REF="$(cat "${REF_FILE}")"
 else
-  IMAGE="${1:-}"
+  REF="${1:-}"
   OUTDIR="${2:-deploy-from-registry}"
-  [[ -n "${IMAGE}" ]] || die "Usage: $0 IMAGE_REF [OUTDIR]  or  $0 --latest [OUTDIR]"
+  [[ -n "${REF}" ]] || die "Usage: $0 IMAGE_REF [OUTDIR]  or  $0 --latest [OUTDIR]"
 fi
-
-# Make sure we can pull
-log ">> Pull: ${IMAGE}"
-# shellcheck disable=SC2086
-$CLI pull "${IMAGE}"
-
-tmp="ourbox_os_artifact_$$"
-# clean any old
-# shellcheck disable=SC2086
-$CLI rm -f "${tmp}" >/dev/null 2>&1 || true
-
-# Scratch image may have no CMD; provide a dummy command so create always succeeds.
-log ">> Create temp container: ${tmp}"
-# shellcheck disable=SC2086
-$CLI create --name "${tmp}" "${IMAGE}" /bin/true >/dev/null
 
 mkdir -p "${OUTDIR}"
 
-log ">> Extracting /artifact -> ${OUTDIR}"
-# shellcheck disable=SC2086
-$CLI cp "${tmp}:/artifact/." "${OUTDIR}/"
+log ">> Pull: ${REF}"
+maybe_login
+oras pull "${REF}" -o "${OUTDIR}"
 
-# cleanup
-# shellcheck disable=SC2086
-$CLI rm -f "${tmp}" >/dev/null
+if [[ ! -f "${OUTDIR}/os.img.xz" ]]; then
+  die "oras pull succeeded but ${OUTDIR}/os.img.xz missing"
+fi
+
+if [[ -f "${OUTDIR}/os.img.xz.sha256" ]]; then
+  expected="$(awk 'NF>=1 {print $1; exit}' "${OUTDIR}/os.img.xz.sha256")"
+  actual="$(sha256sum "${OUTDIR}/os.img.xz" | awk '{print $1}')"
+  [[ "${expected}" == "${actual}" ]] || die "sha mismatch (expected ${expected}, got ${actual})"
+  log "sha256 verified: ${actual}"
+fi
 
 log "DONE: extracted artifact files:"
 ls -lah "${OUTDIR}"

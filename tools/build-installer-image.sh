@@ -31,19 +31,6 @@ fi
 log "Preflight: validating loop-device health before build"
 "${ROOT}/tools/preflight-build-host.sh"
 
-shopt -s nullglob
-payloads=("${ROOT}"/deploy/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz)
-shopt -u nullglob
-if [[ "${#payloads[@]}" -eq 0 ]]; then
-  log "No OS payload found; running ./tools/build-image.sh"
-  OURBOX_TARGET="${OURBOX_TARGET}" "${ROOT}/tools/build-image.sh"
-fi
-
-shopt -s nullglob
-payloads=("${ROOT}"/deploy/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz)
-shopt -u nullglob
-[[ "${#payloads[@]}" -gt 0 ]] || die "missing deploy/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz after build-image"
-
 LOCK_FILE="${ROOT}/deploy/ourbox-build.lock"
 exec 9>"${LOCK_FILE}"
 flock -n 9 || die "another build is already running (lock: ${LOCK_FILE})"

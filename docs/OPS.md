@@ -161,28 +161,49 @@ signatures.
 
 ---
 
-## OCI distribution of the OS image (optional, transport only)
+## OCI distribution of the OS image (transport + installer input)
 
-Publishing the flashable OS image into a registry is optional (per ADR-0003). This is *transport*
-for the OS image bytes — it is not the source of truth for the platform contract.
+OS payloads are published as ORAS artifacts (non-runnable) with files:
+`os.img.xz`, `os.img.xz.sha256`, `os.meta.env`, optional `os.info`/`build.log`.
 
-If you publish/pull via OCI, prefer digest identity for repeatability (tags are convenience).
+Channel tags (moving): `${OURBOX_TARGET}-stable` by default, plus any you set in
+`OS_CHANNEL_TAGS`. Immutable tag defaults to the build basename.
 
-To publish:
+Publish:
 
 ```bash
+# Builds and pushes to OS_REPO (default ghcr.io/techofourown/ourbox-matchbox-os)
 ./tools/publish-os-artifact.sh deploy
 ```
 
-That writes the image reference into `deploy/os-artifact.ref`.
+This writes `deploy/os-artifact.ref` with the immutable ref.
 
-To pull it back out (round-trip validation):
+Pull/verify:
 
 ```bash
 rm -rf ./deploy-from-registry
 ./tools/pull-os-artifact.sh --latest ./deploy-from-registry
 xz -t ./deploy-from-registry/os.img.xz
 ```
+
+Catalog:
+- Channel tags are appended to a TSV catalog `${OURBOX_TARGET}-catalog` so installers can list builds
+  without downloading full images.
+
+Installer runtime:
+- Default fetch: `${OS_REPO}:${OS_TARGET}-stable`
+- Override by editing `/boot/firmware/ourbox-installer.env` on the installer media:
+
+```bash
+OS_REPO=ghcr.io/your-org/ourbox-matchbox-os
+OS_TARGET=rpi
+OS_CHANNEL=beta             # or set OS_REF=repo@sha256:...
+OS_REGISTRY_USERNAME=...
+OS_REGISTRY_PASSWORD=...
+OS_CATALOG_ENABLED=1
+```
+
+During install you can press `l` to list catalog entries or `r` to paste a custom ref.
 
 ---
 
