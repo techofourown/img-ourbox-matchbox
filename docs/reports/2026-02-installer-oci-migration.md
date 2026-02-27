@@ -15,11 +15,11 @@
   - immutable tag (basename by default)
   - moving channel tags (default `${OURBOX_TARGET}-stable`)
   - catalog auto-update (`${OURBOX_TARGET}-catalog`) with metadata row
-- `tools/pull-os-artifact.sh` uses ORAS and verifies sha256 if present.
+- `tools/pull-os-artifact.sh` uses ORAS and requires/verifies sha256.
 
 ## Expected artifact layout (ORAS payload)
 - `os.img.xz`
-- `os.img.xz.sha256` (first field is sha256)
+- `os.img.xz.sha256` (first field is sha256; required)
 - `os.meta.env` (KEY=VALUE; include version/target/sku/contract/k3s/git sha)
 - optional: `os.info`, `build.log`
 Artifact type: `application/vnd.ourbox.matchbox.os-image.v1`.

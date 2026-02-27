@@ -356,7 +356,7 @@ select_from_catalog() {
 
   mapfile -t entries < <(awk -F'\t' 'NR==1 && $1 ~ /channel/ {next} NF>=2 {print NR ":" $0}' "${catalog}")
   if [[ "${#entries[@]}" -eq 0 ]]; then
-    log "Catalog pulled (${catalog_ref}) but contained no entries."
+    log "Catalog pulled (${CATALOG_REF}) but contained no entries."
     return 1
   fi
 
@@ -433,13 +433,12 @@ pull_payload() {
   local sha_file="${PAYLOAD_DIR}/os.img.xz.sha256"
   [[ -f "${sha_file}" ]] || die "payload missing os.img.xz.sha256"
   PAYLOAD_SHA256="$(parse_sha256_file "${sha_file}")"
+  PAYLOAD_SHA256="${PAYLOAD_SHA256,,}"
+  [[ "${PAYLOAD_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "invalid sha256 in os.img.xz.sha256"
 
   local actual_sha
   actual_sha="$(sha256sum "${PAYLOAD_PATH}" | awk '{print $1}')"
-  if [[ -n "${PAYLOAD_SHA256}" && "${PAYLOAD_SHA256}" != "${actual_sha}" ]]; then
-    die "payload SHA mismatch (expected ${PAYLOAD_SHA256}, got ${actual_sha})"
-  fi
-  PAYLOAD_SHA256="${actual_sha}"
+  [[ "${PAYLOAD_SHA256}" == "${actual_sha}" ]] || die "payload SHA mismatch (expected ${PAYLOAD_SHA256}, got ${actual_sha})"
 }
 
 show_payload_metadata() {
@@ -463,8 +462,8 @@ main() {
 
   load_payload_config
   ensure_dirs
-  ensure_oras
   wait_for_network
+  ensure_oras
   maybe_oras_login
   select_payload_ref
   pull_payload "${SELECTED_REF}"

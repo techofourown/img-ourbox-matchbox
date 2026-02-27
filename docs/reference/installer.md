@@ -17,7 +17,7 @@ Key variables:
 - Type: `application/vnd.ourbox.matchbox.os-image.v1`
 - Required files:
   - `os.img.xz`
-  - `os.img.xz.sha256` (first field is the digest)
+  - `os.img.xz.sha256` (first field is the digest; required, install fails if missing/invalid)
   - `os.meta.env` (KEY=VALUE; include version/target/sku/k3s/git sha + platform contract digest)
 - Optional: `os.info`, `build.log`
 

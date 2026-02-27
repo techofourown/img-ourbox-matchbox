@@ -6,8 +6,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/tools/lib.sh"
 
 need_cmd oras
-: "${OS_REGISTRY_USERNAME:=}"
-: "${OS_REGISTRY_PASSWORD:=}"
 need_cmd sha256sum
 : "${OS_REGISTRY_USERNAME:=}"
 : "${OS_REGISTRY_PASSWORD:=}"
@@ -42,12 +40,13 @@ if [[ ! -f "${OUTDIR}/os.img.xz" ]]; then
   die "oras pull succeeded but ${OUTDIR}/os.img.xz missing"
 fi
 
-if [[ -f "${OUTDIR}/os.img.xz.sha256" ]]; then
-  expected="$(awk 'NF>=1 {print $1; exit}' "${OUTDIR}/os.img.xz.sha256")"
-  actual="$(sha256sum "${OUTDIR}/os.img.xz" | awk '{print $1}')"
-  [[ "${expected}" == "${actual}" ]] || die "sha mismatch (expected ${expected}, got ${actual})"
-  log "sha256 verified: ${actual}"
-fi
+[[ -f "${OUTDIR}/os.img.xz.sha256" ]] || die "missing ${OUTDIR}/os.img.xz.sha256"
+expected="$(awk 'NF>=1 {print $1; exit}' "${OUTDIR}/os.img.xz.sha256")"
+expected="${expected,,}"
+[[ "${expected}" =~ ^[0-9a-f]{64}$ ]] || die "invalid sha256 in os.img.xz.sha256"
+actual="$(sha256sum "${OUTDIR}/os.img.xz" | awk '{print $1}')"
+[[ "${expected}" == "${actual}" ]] || die "sha mismatch (expected ${expected}, got ${actual})"
+log "sha256 verified: ${actual}"
 
 log "DONE: extracted artifact files:"
 ls -lah "${OUTDIR}"
