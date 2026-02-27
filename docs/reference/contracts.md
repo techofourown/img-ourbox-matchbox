@@ -103,11 +103,18 @@ systemctl status fstrim.timer --no-pager
 
 ## Contract: Installer media contract
 
-Installer media embeds the target OS payload and runtime installer with these fixed paths:
+Installer media contains the runtime installer and fetches the OS payload at install time.
 
-- Payload image: `/opt/ourbox/installer/os.img.xz`
-- Payload manifest: `/opt/ourbox/installer/manifest.env`
-- Installer entrypoint: `/opt/ourbox/tools/ourbox-install`
+- Entrypoint: `/opt/ourbox/tools/ourbox-install`
+- Defaults: `/opt/ourbox/installer/defaults.env`
+- Optional override (on boot media): `/boot/firmware/ourbox-installer.env`
+- Payload/cache path: `/opt/ourbox/installer/cache/payload`
+- Required payload artifact files (oras pull):
+  - `os.img.xz`
+  - `os.img.xz.sha256` (required; must match content)
+  - `os.meta.env` (KEY=VALUE metadata: target/variant/version/sku/git_sha/k3s/platform contract digest)
+  - optional: `os.info`, `build.log`
+- Optional catalog artifact `${OS_TARGET}-catalog` with `catalog.tsv` for interactive version selection.
 
 ## Contract: Platform runtime (k3s)
 

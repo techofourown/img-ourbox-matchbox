@@ -172,7 +172,7 @@ Channel tags (moving): `${OURBOX_TARGET}-stable` by default, plus any you set in
 Publish:
 
 ```bash
-# Builds and pushes to OS_REPO (default ghcr.io/techofourown/ourbox-matchbox-os)
+# Push latest built payload from deploy/ to OS_REPO (default ghcr.io/techofourown/ourbox-matchbox-os)
 ./tools/publish-os-artifact.sh deploy
 ```
 

@@ -25,6 +25,7 @@ need_cmd openssl
 need_cmd sync
 need_cmd curl
 need_cmd tar
+need_cmd ip
 
 DATA_CHECK_MP="/run/ourbox-installer/data-check"
 SYS_BOOT_MP="/run/ourbox-installer/sys-boot"
