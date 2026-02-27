@@ -17,16 +17,20 @@ We already operate a container registry and have standard tooling to pull blobs 
 
 ## Decision
 
-We will distribute OS images by:
+We will distribute OS images as **OCI artifacts (non-runnable)** pushed with **ORAS**, not as
+container layers. Each artifact carries files directly:
 
-- wrapping `os.img.xz` (and metadata) into a `FROM scratch` OCI image containing `/artifact/*`
-- pushing to `$REGISTRY/$REGISTRY_NAMESPACE/os:<tag>`
-- retrieving via container CLI and extracting `/artifact/*`
+- `os.img.xz`
+- `os.img.xz.sha256`
+- `os.meta.env` (KEY=VALUE metadata)
+- optional `os.info`, `build.log`
 
-This is implemented by:
+Artifact type: `application/vnd.ourbox.matchbox.os-image.v1`
 
-- `tools/publish-os-artifact.sh`
-- `tools/pull-os-artifact.sh`
+Implemented by:
+
+- `tools/publish-os-artifact.sh` (oras push, supports immutable + channel tags, updates catalog)
+- `tools/pull-os-artifact.sh` (oras pull, sha verification)
 
 ## Rationale
 
@@ -39,14 +43,17 @@ This is implemented by:
 ### Positive
 - Standard transport path for OS artifacts
 - Easier repeatability (“pull this ref and flash it”)
+- Works without a container runtime on the consumer (installer uses ORAS directly)
 
 ### Negative
 - Requires registry access + trust (TLS/CA)
-- OCI artifact is not a “standard” OS-image packaging format for all tooling
+- Requires ORAS on hosts/installer (we bootstrap it)
 
 ### Mitigation
 - Keep SCP/USB as a documented fallback
 - Keep metadata alongside the image (`os.info`, `build.log`)
+- Maintain a lightweight catalog (`${target}-catalog`) as a TSV ORAS artifact so installers can list
+  available versions without downloading full images.
 
 ---
 

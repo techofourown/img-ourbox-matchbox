@@ -23,9 +23,31 @@ need_cmd mountpoint
 need_cmd find
 need_cmd openssl
 need_cmd sync
+need_cmd curl
+need_cmd tar
 
 DATA_CHECK_MP="/run/ourbox-installer/data-check"
 SYS_BOOT_MP="/run/ourbox-installer/sys-boot"
+PAYLOAD_DIR="/run/ourbox-installer/payload"
+CATALOG_DIR="/run/ourbox-installer/catalog"
+DEFAULTS_ENV="/opt/ourbox/installer/defaults.env"
+OVERRIDE_ENV="/boot/firmware/ourbox-installer.env"
+
+OS_REPO=""
+OS_TARGET=""
+OS_CHANNEL=""
+OS_CATALOG_ENABLED=1
+OS_CATALOG_TAG=""
+OS_ARTIFACT_TYPE=""
+OS_ORAS_VERSION=""
+OS_REF=""
+OS_REGISTRY_USERNAME=""
+OS_REGISTRY_PASSWORD=""
+SELECTED_REF=""
+SELECTED_TAG=""
+PAYLOAD_PATH=""
+PAYLOAD_SHA256=""
+PAYLOAD_META=""
 
 cleanup_mounts() {
   if mountpoint -q "${DATA_CHECK_MP}"; then
@@ -34,6 +56,10 @@ cleanup_mounts() {
   if mountpoint -q "${SYS_BOOT_MP}"; then
     umount "${SYS_BOOT_MP}" >/dev/null 2>&1 || true
   fi
+}
+
+cleanup_temp() {
+  rm -rf "${PAYLOAD_DIR}" "${CATALOG_DIR}"
 }
 
 finalize() {
@@ -186,37 +212,256 @@ reset_data_bootstrap_marker() {
   umount "${DATA_CHECK_MP}" >/dev/null 2>&1 || true
 }
 
+load_payload_config() {
+  # shellcheck disable=SC1090
+  [[ -f "${DEFAULTS_ENV}" ]] && source "${DEFAULTS_ENV}"
+  # shellcheck disable=SC1090
+  [[ -f "${OVERRIDE_ENV}" ]] && source "${OVERRIDE_ENV}"
+
+  OS_REPO="${OS_REPO:-ghcr.io/techofourown/ourbox-matchbox-os}"
+  OS_TARGET="${OS_TARGET:-rpi}"
+  OS_CHANNEL="${OS_CHANNEL:-stable}"
+  OS_CATALOG_ENABLED="${OS_CATALOG_ENABLED:-1}"
+  OS_CATALOG_TAG="${OS_CATALOG_TAG:-${OS_TARGET}-catalog}"
+  OS_ARTIFACT_TYPE="${OS_ARTIFACT_TYPE:-application/vnd.ourbox.matchbox.os-image.v1}"
+  OS_ORAS_VERSION="${OS_ORAS_VERSION:-1.3.0}"
+  OS_REF="${OS_REF:-}"
+  OS_REGISTRY_USERNAME="${OS_REGISTRY_USERNAME:-}"
+  OS_REGISTRY_PASSWORD="${OS_REGISTRY_PASSWORD:-}"
+}
+
+map_arch() {
+  case "$(uname -m)" in
+    x86_64) echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) die "unsupported architecture: $(uname -m)" ;;
+  esac
+}
+
+ensure_oras() {
+  local desired="v${OS_ORAS_VERSION}"
+  if command -v oras >/dev/null 2>&1; then
+    local current
+    current="$(oras version 2>/dev/null | awk '/Version:/ {print $2}' || true)"
+    if [[ "${current}" == "${OS_ORAS_VERSION}" || "${current}" == "${desired#v}" ]]; then
+      log "ORAS already present (${current})"
+      return 0
+    fi
+    log "ORAS present but not ${OS_ORAS_VERSION}; upgrading"
+  else
+    log "Installing ORAS ${OS_ORAS_VERSION}"
+  fi
+
+  local arch url tmpdir
+  arch="$(map_arch)"
+  url="https://github.com/oras-project/oras/releases/download/v${OS_ORAS_VERSION}/oras_${OS_ORAS_VERSION}_linux_${arch}.tar.gz"
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "${tmpdir}"' RETURN
+  curl -fsSL -o "${tmpdir}/oras.tgz" "${url}"
+  tar -C "${tmpdir}" -xzf "${tmpdir}/oras.tgz" oras
+  install -m 0755 "${tmpdir}/oras" /usr/local/bin/oras
+  trap - RETURN
+  rm -rf "${tmpdir}"
+  log "ORAS installed: $(oras version 2>/dev/null | tr -d \"\r\")"
+}
+
+maybe_oras_login() {
+  if [[ -n "${OS_REGISTRY_USERNAME}" ]]; then
+    log "Logging into registry for ${OS_REPO}"
+    oras login "$(echo "${OS_REPO}" | cut -d/ -f1)" -u "${OS_REGISTRY_USERNAME}" --password "${OS_REGISTRY_PASSWORD:-}" >/dev/null
+  fi
+}
+
+ensure_dirs() {
+  cleanup_temp
+  mkdir -p "${PAYLOAD_DIR}" "${CATALOG_DIR}"
+}
+
 banner() {
   echo "=================================================================="
   echo "OurBox Matchbox Installer"
   echo "=================================================================="
 }
 
-main() {
-  local payload="/opt/ourbox/installer/os.img.xz"
-  local manifest="/opt/ourbox/installer/manifest.env"
+show_default_choice() {
+  local ref="$1"
+  echo
+  echo "Default: install '${ref}'"
+  echo "Options:"
+  echo "  [ENTER] Use default"
+  echo "  c       Choose channel (stable/beta/nightly/exp-labs/custom)"
+  echo "  l       List from catalog (if available)"
+  echo "  r       Enter custom OCI ref (tag or digest)"
+  echo "  q       Quit"
+  echo
+}
 
-  banner
+choose_channel() {
+  local base="${OS_REPO}:${OS_TARGET}-"
+  echo "Channels:"
+  echo "  1) ${base}stable (recommended)"
+  echo "  2) ${base}beta"
+  echo "  3) ${base}nightly"
+  echo "  4) ${base}exp-labs"
+  echo "  5) custom channel name"
+  local pick=""
+  read -r -p "Select channel [1-5]: " pick
+  case "${pick}" in
+    1|"") SELECTED_REF="${base}stable" ;;
+    2) SELECTED_REF="${base}beta" ;;
+    3) SELECTED_REF="${base}nightly" ;;
+    4) SELECTED_REF="${base}exp-labs" ;;
+    5)
+      local ch=""
+      read -r -p "Enter channel suffix: " ch
+      [[ -n "${ch}" ]] || die "channel cannot be empty"
+      SELECTED_REF="${base}${ch}"
+      ;;
+    *) log "Invalid choice, using default";;
+  esac
+}
 
-  [[ -f "${payload}" ]] || die "missing payload: ${payload}"
-  [[ -f "${manifest}" ]] || die "missing manifest: ${manifest}"
+pull_catalog() {
+  [[ "${OS_CATALOG_ENABLED}" == "1" ]] || return 1
+  local dst="$1"
+  local ref="${OS_REPO}:${OS_CATALOG_TAG}"
+  rm -rf "${dst}"
+  mkdir -p "${dst}"
+  log "Pulling catalog: ${ref}"
+  if oras pull "${ref}" -o "${dst}" >/dev/null 2>&1; then
+    [[ -f "${dst}/catalog.tsv" ]] || return 1
+    echo "${ref}"
+    return 0
+  fi
+  return 1
+}
 
-  # shellcheck disable=SC1090
-  source "${manifest}"
+select_from_catalog() {
+  local catalog_ref
+  catalog_ref="$(pull_catalog "${CATALOG_DIR}")" || { log "Catalog unavailable; skipping list."; return 1; }
+  local catalog="${CATALOG_DIR}/catalog.tsv"
 
-  echo "Payload basename: ${PAYLOAD_BASENAME:-unknown}"
-  echo "Payload sha256 : ${PAYLOAD_SHA256:-unknown}"
-  echo "Build TS       : ${BUILD_TS:-unknown}"
-  echo "Variant        : ${OURBOX_VARIANT:-dev}"
-  echo "Version        : ${OURBOX_VERSION:-dev}"
+  mapfile -t entries < <(awk -F'\t' 'NR==1 && $1 ~ /channel/ {next} NF>=2 {print NR ":" $0}' "${catalog}")
+  if [[ "${#entries[@]}" -eq 0 ]]; then
+    log "Catalog pulled (${catalog_ref}) but contained no entries."
+    return 1
+  fi
 
-  log "Verifying compressed payload integrity"
-  xz -t "${payload}"
+  echo
+  echo "Catalog entries (${catalog_ref}):"
+  local i=1
+  for line in "${entries[@]}"; do
+    IFS=$'\t' read -r idx channel tag created version variant target sku gitsha contract k3s imgsha <<<"${line#*:}"
+    printf "  %d) %-12s %-30s %s %s %s\n" "${i}" "${channel}" "${tag}" "${version}" "${created}" "${contract}"
+    i=$((i+1))
+  done
+
+  local pick=""
+  read -r -p "Choose entry [1-${#entries[@]}] (or ENTER to cancel): " pick
+  [[ -z "${pick}" ]] && return 1
+  [[ "${pick}" =~ ^[0-9]+$ ]] || { log "Invalid selection"; return 1; }
+  if (( pick < 1 || pick > ${#entries[@]} )); then
+    log "Selection out of range"
+    return 1
+  fi
+  local chosen="${entries[$((pick-1))]}"
+  IFS=$'\t' read -r _ channel tag created version variant target sku gitsha contract k3s imgsha <<<"${chosen#*:}"
+  SELECTED_TAG="${tag}"
+  SELECTED_REF="${OS_REPO}:${tag}"
+  log "Selected ${SELECTED_REF} (channel=${channel}, version=${version}, contract=${contract})"
+  return 0
+}
+
+select_payload_ref() {
+  SELECTED_REF=""
+  local default_ref
+  if [[ -n "${OS_REF}" ]]; then
+    default_ref="${OS_REF}"
+  else
+    default_ref="${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}"
+  fi
+
+  while [[ -z "${SELECTED_REF}" ]]; do
+    show_default_choice "${default_ref}"
+    local choice=""
+    read -r -p "Choice: " choice
+    case "${choice}" in
+      "" ) SELECTED_REF="${default_ref}" ;;
+      c ) choose_channel ;;
+      l ) select_from_catalog || true ;;
+      r )
+        read -r -p "Enter full OCI ref (e.g., repo:tag or repo@sha256:...): " ref
+        [[ -n "${ref}" ]] || { log "Ref cannot be empty"; continue; }
+        SELECTED_REF="${ref}"
+        ;;
+      q|Q ) die "Install aborted by user" ;;
+      * ) log "Unknown option" ;;
+    esac
+  done
+}
+
+parse_sha256_file() {
+  local file="$1"
+  awk 'NF>=1 {print $1; exit}' "${file}"
+}
+
+pull_payload() {
+  local ref="$1"
+  rm -rf "${PAYLOAD_DIR}"
+  mkdir -p "${PAYLOAD_DIR}"
+  log "Pulling OS payload: ${ref}"
+  oras pull "${ref}" -o "${PAYLOAD_DIR}"
+
+  PAYLOAD_PATH="${PAYLOAD_DIR}/os.img.xz"
+  [[ -f "${PAYLOAD_PATH}" ]] || die "oras pull succeeded but os.img.xz missing from payload"
+
+  PAYLOAD_META="${PAYLOAD_DIR}/os.meta.env"
+
+  local sha_file="${PAYLOAD_DIR}/os.img.xz.sha256"
+  if [[ -f "${sha_file}" ]]; then
+    PAYLOAD_SHA256="$(parse_sha256_file "${sha_file}")"
+  else
+    PAYLOAD_SHA256=""
+  fi
 
   local actual_sha
-  actual_sha="$(sha256sum "${payload}" | awk '{print $1}')"
-  [[ -n "${PAYLOAD_SHA256:-}" ]] || die "manifest missing PAYLOAD_SHA256"
-  [[ "${actual_sha}" == "${PAYLOAD_SHA256}" ]] || die "payload SHA256 mismatch"
+  actual_sha="$(sha256sum "${PAYLOAD_PATH}" | awk '{print $1}')"
+  if [[ -n "${PAYLOAD_SHA256}" && "${PAYLOAD_SHA256}" != "${actual_sha}" ]]; then
+    die "payload SHA mismatch (expected ${PAYLOAD_SHA256}, got ${actual_sha})"
+  fi
+  PAYLOAD_SHA256="${actual_sha}"
+}
+
+show_payload_metadata() {
+  echo
+  echo "Payload source : ${SELECTED_REF}"
+  echo "Payload sha256 : ${PAYLOAD_SHA256}"
+  if [[ -f "${PAYLOAD_META}" ]]; then
+    echo "Payload metadata:"
+    while IFS='=' read -r k v; do
+      [[ -z "${k}" ]] && continue
+      printf "  %s=%s\n" "${k}" "${v}"
+    done < "${PAYLOAD_META}"
+  else
+    echo "Payload metadata: (os.meta.env not present)"
+  fi
+  echo
+}
+
+main() {
+  banner
+
+  load_payload_config
+  ensure_dirs
+  ensure_oras
+  maybe_oras_login
+  select_payload_ref
+  pull_payload "${SELECTED_REF}"
+
+  log "Verifying compressed payload integrity"
+  xz -t "${PAYLOAD_PATH}"
+
+  show_payload_metadata
 
   log "Running hard safety preflight"
   local root_src root_real root_parent
@@ -338,7 +583,7 @@ main() {
   sync
 
   log "Flashing payload to SYSTEM"
-  xzcat "${payload}" | dd of="${sys_disk}" bs=4M conv=fsync status=progress
+  xzcat "${PAYLOAD_PATH}" | dd of="${sys_disk}" bs=4M conv=fsync status=progress
   sync
 
   partprobe "${sys_disk}" || true
