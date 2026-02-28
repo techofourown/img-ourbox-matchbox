@@ -25,7 +25,8 @@ DEPLOY_DIR="${1:-deploy}"
 : "${OS_INCLUDE_BUILD_LOG:=0}"   # 1 to publish build.log as artifact attachment
 CATALOG_HEADER=$'channel\ttag\tcreated\tversion\tvariant\ttarget\tsku\tgit_sha\tplatform_contract_digest\tk3s_version\timg_sha256\tartifact_digest\tpinned_ref'
 
-IMG_XZ="$(ls -1t "${DEPLOY_DIR}"/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz 2>/dev/null | head -n 1 || true)"
+# shellcheck disable=SC2012
+IMG_XZ="$(ls -1t "${DEPLOY_DIR}"/img-ourbox-matchbox-"${OURBOX_TARGET,,}"-*.img.xz 2>/dev/null | head -n 1 || true)"
 if [ -z "${IMG_XZ}" ] || [ ! -f "${IMG_XZ}" ]; then
   die "No ${DEPLOY_DIR}/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz found. Did the build finish?"
 fi
@@ -34,7 +35,7 @@ BASE="$(basename "${IMG_XZ}" .img.xz)"
 OS_IMMUTABLE_TAG="${OS_IMMUTABLE_TAG:-${BASE}}"
 
 TMP="$(mktemp -d)"
-trap "rm -rf '${TMP}'" EXIT
+trap 'rm -rf "${TMP}"' EXIT
 
 log "Preparing OS artifact payload for ${OS_REPO}"
 
@@ -47,9 +48,9 @@ EOF
 
 INFO="${DEPLOY_DIR}/${BASE}.info"
 BLOG="${DEPLOY_DIR}/build.log"
-[ -f "${INFO}" ] && cp "${INFO}" "${TMP}/os.info" || true
+if [ -f "${INFO}" ]; then cp "${INFO}" "${TMP}/os.info"; fi
 if [[ "${OS_INCLUDE_BUILD_LOG}" == "1" ]]; then
-  [ -f "${BLOG}" ] && cp "${BLOG}" "${TMP}/build.log" || true
+  if [ -f "${BLOG}" ]; then cp "${BLOG}" "${TMP}/build.log"; fi
 fi
 
 CONTRACT_DIGEST_FILE="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-airgap-platform/files/opt/ourbox/airgap/platform/contract.digest"

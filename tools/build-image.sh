@@ -112,7 +112,8 @@ log "Collecting build artifacts into ${ROOT}/deploy (normalizing pi-gen output p
 
 move_into_deploy() {
   local src="$1"
-  local dst="${ROOT}/deploy/$(basename "${src}")"
+  local dst
+  dst="${ROOT}/deploy/$(basename "${src}")"
 
   if mv -f "${src}" "${dst}" 2>/dev/null; then
     return 0
@@ -153,6 +154,7 @@ if command -v sudo >/dev/null 2>&1; then
 fi
 
 log "Postflight: validating deploy outputs"
+# shellcheck disable=SC2012
 IMG_XZ="$(ls -1t "${ROOT}/deploy"/img-*.img.xz 2>/dev/null | head -n 1 || true)"
 [[ -n "${IMG_XZ}" && -f "${IMG_XZ}" ]] || die "build did not produce deploy/img-*.img.xz"
 [[ "${IMG_XZ}" -nt "${BUILD_MARKER}" ]] || die "deploy/img-*.img.xz exists but is not from this build (stale artifact)"

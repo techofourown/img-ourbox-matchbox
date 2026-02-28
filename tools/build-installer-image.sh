@@ -78,7 +78,8 @@ fi
 
 move_into_deploy() {
   local src="$1"
-  local dst="${ROOT}/deploy/$(basename "${src}")"
+  local dst
+  dst="${ROOT}/deploy/$(basename "${src}")"
 
   if mv -f "${src}" "${dst}" 2>/dev/null; then
     return 0
@@ -91,7 +92,7 @@ move_into_deploy() {
 }
 
 shopt -s nullglob
-for f in "${ROOT}"/*installer-ourbox-matchbox-${OURBOX_TARGET,,}-*; do
+for f in "${ROOT}"/*installer-ourbox-matchbox-"${OURBOX_TARGET,,}"-*; do
   [[ -f "${f}" ]] || continue
   [[ "${f}" -nt "${BUILD_MARKER}" ]] || continue
   case "${f}" in
@@ -115,7 +116,8 @@ if command -v sudo >/dev/null 2>&1; then
   sudo chown -R "$(id -u):$(id -g)" "${ROOT}/deploy" >/dev/null 2>&1 || true
 fi
 
-installer_img="$(ls -1t "${ROOT}"/deploy/*installer-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz 2>/dev/null | head -n 1 || true)"
+# shellcheck disable=SC2012
+installer_img="$(ls -1t "${ROOT}"/deploy/*installer-ourbox-matchbox-"${OURBOX_TARGET,,}"-*.img.xz 2>/dev/null | head -n 1 || true)"
 
 if [[ -z "${installer_img}" || ! -f "${installer_img}" ]]; then
   log "ERROR: installer artifact not found where expected."
@@ -123,7 +125,7 @@ if [[ -z "${installer_img}" || ! -f "${installer_img}" ]]; then
   log "Deploy dir contents:"
   ls -lah "${ROOT}/deploy" || true
   log "Repo root candidates (may exist if pi-gen wrote outside deploy/):"
-  ls -lah "${ROOT}"/*installer-ourbox-matchbox-${OURBOX_TARGET,,}-* 2>/dev/null || true
+  ls -lah "${ROOT}"/*installer-ourbox-matchbox-"${OURBOX_TARGET,,}"-* 2>/dev/null || true
   die "build did not produce an installer .img.xz artifact"
 fi
 
