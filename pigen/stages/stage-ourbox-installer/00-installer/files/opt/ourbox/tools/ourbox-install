@@ -31,12 +31,15 @@ DATA_CHECK_MP="/run/ourbox-installer/data-check"
 SYS_BOOT_MP="/run/ourbox-installer/sys-boot"
 PAYLOAD_DIR="/opt/ourbox/installer/cache/payload"
 CATALOG_DIR="/opt/ourbox/installer/cache/catalog"
+INSTALL_DEFAULTS_DIR="/opt/ourbox/installer/cache/install-defaults"
+INSTALL_DEFAULTS_EXTRACT_DIR="/opt/ourbox/installer/cache/install-defaults-extracted"
 DEFAULTS_ENV="/opt/ourbox/installer/defaults.env"
 OVERRIDE_ENV="/boot/firmware/ourbox-installer.env"
 
 OS_REPO=""
 OS_TARGET=""
 OS_CHANNEL=""
+OS_DEFAULT_REF=""
 OS_CATALOG_ENABLED=1
 OS_CATALOG_TAG=""
 OS_ARTIFACT_TYPE=""
@@ -44,6 +47,14 @@ OS_ORAS_VERSION=""
 OS_REF=""
 OS_REGISTRY_USERNAME=""
 OS_REGISTRY_PASSWORD=""
+INSTALL_DEFAULTS_REF=""
+INSTALLER_ID=""
+CHANNEL_STABLE_TAG=""
+CHANNEL_BETA_TAG=""
+CHANNEL_NIGHTLY_TAG=""
+CHANNEL_EXP_LABS_TAG=""
+INSTALL_DEFAULTS_APPLIED=0
+INSTALL_DEFAULTS_PROFILE=""
 SELECTED_REF=""
 SELECTED_TAG=""
 PAYLOAD_PATH=""
@@ -60,7 +71,7 @@ cleanup_mounts() {
 }
 
 cleanup_temp() {
-  rm -rf "${PAYLOAD_DIR}" "${CATALOG_DIR}"
+  rm -rf "${PAYLOAD_DIR}" "${CATALOG_DIR}" "${INSTALL_DEFAULTS_DIR}" "${INSTALL_DEFAULTS_EXTRACT_DIR}"
 }
 
 finalize() {
@@ -213,15 +224,11 @@ reset_data_bootstrap_marker() {
   umount "${DATA_CHECK_MP}" >/dev/null 2>&1 || true
 }
 
-load_payload_config() {
-  # shellcheck disable=SC1090
-  [[ -f "${DEFAULTS_ENV}" ]] && source "${DEFAULTS_ENV}"
-  # shellcheck disable=SC1090
-  [[ -f "${OVERRIDE_ENV}" ]] && source "${OVERRIDE_ENV}"
-
+normalize_payload_config() {
   OS_REPO="${OS_REPO:-ghcr.io/techofourown/ourbox-matchbox-os}"
   OS_TARGET="${OS_TARGET:-rpi}"
   OS_CHANNEL="${OS_CHANNEL:-stable}"
+  OS_DEFAULT_REF="${OS_DEFAULT_REF:-}"
   OS_CATALOG_ENABLED="${OS_CATALOG_ENABLED:-1}"
   OS_CATALOG_TAG="${OS_CATALOG_TAG:-${OS_TARGET}-catalog}"
   OS_ARTIFACT_TYPE="${OS_ARTIFACT_TYPE:-application/vnd.ourbox.matchbox.os-image.v1}"
@@ -229,6 +236,69 @@ load_payload_config() {
   OS_REF="${OS_REF:-}"
   OS_REGISTRY_USERNAME="${OS_REGISTRY_USERNAME:-}"
   OS_REGISTRY_PASSWORD="${OS_REGISTRY_PASSWORD:-}"
+  INSTALL_DEFAULTS_REF="${INSTALL_DEFAULTS_REF:-ghcr.io/techofourown/sw-ourbox-os/install-defaults:stable}"
+  INSTALLER_ID="${INSTALLER_ID:-matchbox}"
+  CHANNEL_STABLE_TAG="${CHANNEL_STABLE_TAG:-${OS_TARGET}-stable}"
+  CHANNEL_BETA_TAG="${CHANNEL_BETA_TAG:-${OS_TARGET}-beta}"
+  CHANNEL_NIGHTLY_TAG="${CHANNEL_NIGHTLY_TAG:-${OS_TARGET}-nightly}"
+  CHANNEL_EXP_LABS_TAG="${CHANNEL_EXP_LABS_TAG:-${OS_TARGET}-exp-labs}"
+}
+
+load_payload_config() {
+
+  # shellcheck disable=SC1090
+  [[ -f "${DEFAULTS_ENV}" ]] && source "${DEFAULTS_ENV}"
+  # shellcheck disable=SC1090
+  [[ -f "${OVERRIDE_ENV}" ]] && source "${OVERRIDE_ENV}"
+
+  normalize_payload_config
+}
+
+load_remote_install_defaults() {
+  INSTALL_DEFAULTS_APPLIED=0
+  INSTALL_DEFAULTS_PROFILE=""
+
+  [[ -n "${INSTALL_DEFAULTS_REF}" ]] || return 0
+
+  rm -rf "${INSTALL_DEFAULTS_DIR}" "${INSTALL_DEFAULTS_EXTRACT_DIR}"
+  mkdir -p "${INSTALL_DEFAULTS_DIR}" "${INSTALL_DEFAULTS_EXTRACT_DIR}"
+
+  log "Pulling installer defaults: ${INSTALL_DEFAULTS_REF}"
+  if ! oras pull "${INSTALL_DEFAULTS_REF}" -o "${INSTALL_DEFAULTS_DIR}" >/dev/null 2>&1; then
+    log "Install defaults pull failed; using baked defaults."
+    return 0
+  fi
+
+  local tarball
+  tarball="${INSTALL_DEFAULTS_DIR}/dist/install-defaults.tar.gz"
+  if [[ ! -f "${tarball}" ]]; then
+    tarball="$(find "${INSTALL_DEFAULTS_DIR}" -maxdepth 4 -type f -name 'install-defaults.tar.gz' | head -n 1 || true)"
+  fi
+  [[ -n "${tarball}" && -f "${tarball}" ]] || { log "Install defaults artifact missing tarball; using baked defaults."; return 0; }
+
+  if ! tar -xzf "${tarball}" -C "${INSTALL_DEFAULTS_EXTRACT_DIR}" >/dev/null 2>&1; then
+    log "Install defaults tar extraction failed; using baked defaults."
+    return 0
+  fi
+
+  local profile
+  profile="${INSTALL_DEFAULTS_EXTRACT_DIR}/install-defaults/defaults/${INSTALLER_ID}.env"
+  if [[ ! -f "${profile}" ]]; then
+    log "No install-defaults profile for installer '${INSTALLER_ID}'; using baked defaults."
+    return 0
+  fi
+
+  # shellcheck disable=SC1090
+  source "${profile}"
+  # Re-apply local boot-media overrides so operators keep final control.
+  # shellcheck disable=SC1090
+  [[ -f "${OVERRIDE_ENV}" ]] && source "${OVERRIDE_ENV}"
+
+  normalize_payload_config
+
+  INSTALL_DEFAULTS_APPLIED=1
+  INSTALL_DEFAULTS_PROFILE="${profile}"
+  log "Applied install-defaults profile for '${INSTALLER_ID}'."
 }
 
 map_arch() {
@@ -300,36 +370,91 @@ banner() {
 show_default_choice() {
   local ref="$1"
   echo
+  if [[ "${INSTALL_DEFAULTS_APPLIED}" -eq 1 ]]; then
+    echo "Install defaults profile: ${INSTALLER_ID} (${INSTALL_DEFAULTS_REF})"
+  else
+    echo "Install defaults profile: baked defaults"
+  fi
   echo "Default: install '${ref}'"
   echo "Options:"
   echo "  [ENTER] Use default"
   echo "  c       Choose channel (stable/beta/nightly/exp-labs/custom)"
   echo "  l       List from catalog (if available)"
   echo "  r       Enter custom OCI ref (tag or digest)"
+  echo "  o       Override OS repo (custom registry/fork)"
   echo "  q       Quit"
   echo
 }
 
+ref_from_tag() {
+  local tag="$1"
+  echo "${OS_REPO}:${tag}"
+}
+
+tag_for_channel() {
+  local channel="$1"
+  case "${channel}" in
+    stable) echo "${CHANNEL_STABLE_TAG}" ;;
+    beta) echo "${CHANNEL_BETA_TAG}" ;;
+    nightly) echo "${CHANNEL_NIGHTLY_TAG}" ;;
+    exp-labs) echo "${CHANNEL_EXP_LABS_TAG}" ;;
+    *) echo "${OS_TARGET}-${channel}" ;;
+  esac
+}
+
+default_payload_ref() {
+  if [[ -n "${OS_REF}" ]]; then
+    echo "${OS_REF}"
+    return 0
+  fi
+  if [[ -n "${OS_DEFAULT_REF}" ]]; then
+    echo "${OS_DEFAULT_REF}"
+    return 0
+  fi
+  ref_from_tag "$(tag_for_channel "${OS_CHANNEL}")"
+}
+
+override_repo() {
+  local next_repo=""
+  read -r -p "Enter OCI repo (e.g., ghcr.io/org/ourbox-matchbox-os): " next_repo
+  [[ -n "${next_repo}" ]] || { log "Repository cannot be empty"; return 1; }
+  OS_REPO="${next_repo}"
+
+  # A repo override intentionally clears pinned defaults from upstream profile.
+  OS_REF=""
+  OS_DEFAULT_REF=""
+
+  local next_catalog="${OS_TARGET}-catalog"
+  local user_catalog=""
+  read -r -p "Catalog tag [${next_catalog}]: " user_catalog
+  if [[ -n "${user_catalog}" ]]; then
+    OS_CATALOG_TAG="${user_catalog}"
+  else
+    OS_CATALOG_TAG="${next_catalog}"
+  fi
+
+  log "OS repo override set to ${OS_REPO}"
+}
+
 choose_channel() {
-  local base="${OS_REPO}:${OS_TARGET}-"
   echo "Channels:"
-  echo "  1) ${base}stable (recommended)"
-  echo "  2) ${base}beta"
-  echo "  3) ${base}nightly"
-  echo "  4) ${base}exp-labs"
-  echo "  5) custom channel name"
+  echo "  1) ${CHANNEL_STABLE_TAG} (recommended)"
+  echo "  2) ${CHANNEL_BETA_TAG}"
+  echo "  3) ${CHANNEL_NIGHTLY_TAG}"
+  echo "  4) ${CHANNEL_EXP_LABS_TAG}"
+  echo "  5) custom tag name"
   local pick=""
   read -r -p "Select channel [1-5]: " pick
   case "${pick}" in
-    1|"") SELECTED_REF="${base}stable" ;;
-    2) SELECTED_REF="${base}beta" ;;
-    3) SELECTED_REF="${base}nightly" ;;
-    4) SELECTED_REF="${base}exp-labs" ;;
+    1|"") SELECTED_REF="$(ref_from_tag "${CHANNEL_STABLE_TAG}")" ;;
+    2) SELECTED_REF="$(ref_from_tag "${CHANNEL_BETA_TAG}")" ;;
+    3) SELECTED_REF="$(ref_from_tag "${CHANNEL_NIGHTLY_TAG}")" ;;
+    4) SELECTED_REF="$(ref_from_tag "${CHANNEL_EXP_LABS_TAG}")" ;;
     5)
       local ch=""
-      read -r -p "Enter channel suffix: " ch
-      [[ -n "${ch}" ]] || die "channel cannot be empty"
-      SELECTED_REF="${base}${ch}"
+      read -r -p "Enter tag: " ch
+      [[ -n "${ch}" ]] || die "tag cannot be empty"
+      SELECTED_REF="$(ref_from_tag "${ch}")"
       ;;
     *) log "Invalid choice, using default";;
   esac
@@ -388,14 +513,10 @@ select_from_catalog() {
 
 select_payload_ref() {
   SELECTED_REF=""
-  local default_ref
-  if [[ -n "${OS_REF}" ]]; then
-    default_ref="${OS_REF}"
-  else
-    default_ref="${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}"
-  fi
 
   while [[ -z "${SELECTED_REF}" ]]; do
+    local default_ref
+    default_ref="$(default_payload_ref)"
     show_default_choice "${default_ref}"
     local choice=""
     read -r -p "Choice: " choice
@@ -408,6 +529,7 @@ select_payload_ref() {
         [[ -n "${ref}" ]] || { log "Ref cannot be empty"; continue; }
         SELECTED_REF="${ref}"
         ;;
+      o ) override_repo || true ;;
       q|Q ) die "Install aborted by user" ;;
       * ) log "Unknown option" ;;
     esac
@@ -444,6 +566,11 @@ pull_payload() {
 
 show_payload_metadata() {
   echo
+  if [[ "${INSTALL_DEFAULTS_APPLIED}" -eq 1 ]]; then
+    echo "Install defaults: ${INSTALL_DEFAULTS_REF} (${INSTALL_DEFAULTS_PROFILE})"
+  else
+    echo "Install defaults: baked defaults"
+  fi
   echo "Payload source : ${SELECTED_REF}"
   echo "Payload sha256 : ${PAYLOAD_SHA256}"
   if [[ -f "${PAYLOAD_META}" ]]; then
@@ -465,6 +592,8 @@ main() {
   ensure_dirs
   wait_for_network
   ensure_oras
+  maybe_oras_login
+  load_remote_install_defaults
   maybe_oras_login
   select_payload_ref
   pull_payload "${SELECTED_REF}"

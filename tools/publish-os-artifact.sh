@@ -22,6 +22,7 @@ DEPLOY_DIR="${1:-deploy}"
 : "${OS_CHANNEL_TAGS:=${OURBOX_TARGET}-stable}"   # space-separated moving tags to update (e.g., "rpi-stable rpi-beta")
 : "${OS_REGISTRY_USERNAME:=}"
 : "${OS_REGISTRY_PASSWORD:=}"
+CATALOG_HEADER=$'channel\ttag\tcreated\tversion\tvariant\ttarget\tsku\tgit_sha\tplatform_contract_digest\tk3s_version\timg_sha256\tartifact_digest\tpinned_ref'
 
 IMG_XZ="$(ls -1t "${DEPLOY_DIR}"/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz 2>/dev/null | head -n 1 || true)"
 if [ -z "${IMG_XZ}" ] || [ ! -f "${IMG_XZ}" ]; then
@@ -98,7 +99,19 @@ push_ref() {
   )
   [[ -f "${TMP}/os.info" ]] && args+=("${TMP}/os.info:text/plain")
   [[ -f "${TMP}/build.log" ]] && args+=("${TMP}/build.log:text/plain")
-  oras push "${args[@]}"
+  local out status digest
+  set +e
+  out="$(oras push "${args[@]}" 2>&1)"
+  status=$?
+  set -e
+  printf '%s\n' "${out}"
+  if [[ "${status}" -ne 0 ]]; then
+    die "oras push failed for ${ref} (exit ${status})"
+  fi
+  digest="$(printf '%s\n' "${out}" | grep -Eo 'sha256:[0-9a-f]{64}' | tail -n1)"
+  [[ -n "${digest}" ]] || die "Failed to capture digest from oras output for ${ref}"
+  LAST_PUSH_DIGEST="${digest}"
+  log ">> Digest ${tag}: ${digest}"
 }
 
 maybe_login() {
@@ -110,9 +123,10 @@ maybe_login() {
 }
 
 update_catalog() {
-  local channel_tag="$1" immutable_tag="$2"
+  local channel_tag="$1" immutable_tag="$2" immutable_digest="$3"
   local catalog_tmp="${TMP}/catalog"
   local catalog_file="${catalog_tmp}/catalog.tsv"
+  local pinned_ref="${OS_REPO}@${immutable_digest}"
   rm -rf "${catalog_tmp}"
   mkdir -p "${catalog_tmp}"
 
@@ -120,17 +134,25 @@ update_catalog() {
   if oras pull "${catalog_ref}" -o "${catalog_tmp}" >/dev/null 2>&1; then
     log "Catalog pulled: ${catalog_ref}"
   else
-    echo -e "channel\ttag\tcreated\tversion\tvariant\ttarget\tsku\tgit_sha\tplatform_contract_digest\tk3s_version\timg_sha256" > "${catalog_file}"
+    printf '%s\n' "${CATALOG_HEADER}" > "${catalog_file}"
   fi
 
-  [[ -f "${catalog_file}" ]] || echo -e "channel\ttag\tcreated\tversion\tvariant\ttarget\tsku\tgit_sha\tplatform_contract_digest\tk3s_version\timg_sha256" > "${catalog_file}"
-
-  local channel="${channel_tag:-custom}"
-  # Replace any existing row for the tag
-  grep -v -F $'\t'"${immutable_tag}"$'\t' "${catalog_file}" > "${catalog_file}.tmp" || true
+  [[ -f "${catalog_file}" ]] || printf '%s\n' "${CATALOG_HEADER}" > "${catalog_file}"
+  {
+    printf '%s\n' "${CATALOG_HEADER}"
+    tail -n +2 "${catalog_file}" 2>/dev/null || true
+  } > "${catalog_file}.tmp"
   mv "${catalog_file}.tmp" "${catalog_file}"
 
-  echo -e "${channel}\t${immutable_tag}\t${BUILD_TS}\t${OURBOX_VERSION}\t${OURBOX_VARIANT}\t${OURBOX_TARGET}\t${OURBOX_SKU}\t${GIT_SHA}\t${CONTRACT_DIGEST}\t${K3S_VERSION}\t${SHA256}" >> "${catalog_file}"
+  local channel="${channel_tag:-custom}"
+  # Replace only an existing row with the same (channel, tag).
+  awk -F '\t' -v ch="${channel}" -v tag="${immutable_tag}" '
+    NR == 1 { print; next }
+    !($1 == ch && $2 == tag) { print }
+  ' "${catalog_file}" > "${catalog_file}.tmp"
+  mv "${catalog_file}.tmp" "${catalog_file}"
+
+  echo -e "${channel}\t${immutable_tag}\t${BUILD_TS}\t${OURBOX_VERSION}\t${OURBOX_VARIANT}\t${OURBOX_TARGET}\t${OURBOX_SKU}\t${GIT_SHA}\t${CONTRACT_DIGEST}\t${K3S_VERSION}\t${SHA256}\t${immutable_digest}\t${pinned_ref}" >> "${catalog_file}"
 
   log ">> Updating catalog: ${catalog_ref}"
   oras push "${catalog_ref}" \
@@ -140,13 +162,18 @@ update_catalog() {
 
 # Push immutable tag first
 maybe_login
+LAST_PUSH_DIGEST=""
 push_ref "${OS_IMMUTABLE_TAG}"
+IMMUTABLE_DIGEST="${LAST_PUSH_DIGEST}"
+IMMUTABLE_PINNED_REF="${OS_REPO}@${IMMUTABLE_DIGEST}"
 echo "${OS_REPO}:${OS_IMMUTABLE_TAG}" > "${DEPLOY_DIR}/os-artifact.ref"
+echo "${IMMUTABLE_PINNED_REF}" > "${DEPLOY_DIR}/os-artifact.pinned.ref"
+echo "${IMMUTABLE_DIGEST}" > "${DEPLOY_DIR}/os-artifact.digest"
 
 # Then moving channel tags (optional)
 for ch in ${OS_CHANNEL_TAGS}; do
   push_ref "${ch}"
-  update_catalog "${ch}" "${OS_IMMUTABLE_TAG}"
+  update_catalog "${ch}" "${OS_IMMUTABLE_TAG}" "${IMMUTABLE_DIGEST}"
 done
 
 log "DONE: published ${OS_IMMUTABLE_TAG} (and channels: ${OS_CHANNEL_TAGS:-none}) to ${OS_REPO}"

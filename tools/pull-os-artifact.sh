@@ -21,7 +21,10 @@ maybe_login() {
 if [[ "${1:-}" == "--latest" ]]; then
   shift
   OUTDIR="${1:-deploy-from-registry}"
-  REF_FILE="${ROOT}/deploy/os-artifact.ref"
+  REF_FILE="${ROOT}/deploy/os-artifact.pinned.ref"
+  if [[ ! -f "${REF_FILE}" ]]; then
+    REF_FILE="${ROOT}/deploy/os-artifact.ref"
+  fi
   [[ -f "${REF_FILE}" ]] || die "${REF_FILE} not found. Run ./tools/publish-os-artifact.sh deploy first, or pass IMAGE_REF explicitly."
   REF="$(cat "${REF_FILE}")"
 else

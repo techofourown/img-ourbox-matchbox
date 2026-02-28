@@ -176,7 +176,10 @@ Publish:
 ./tools/publish-os-artifact.sh deploy
 ```
 
-This writes `deploy/os-artifact.ref` with the immutable ref.
+This writes:
+- `deploy/os-artifact.ref` (immutable tag ref)
+- `deploy/os-artifact.pinned.ref` (digest-pinned immutable ref)
+- `deploy/os-artifact.digest` (artifact digest only)
 
 Pull/verify:
 
