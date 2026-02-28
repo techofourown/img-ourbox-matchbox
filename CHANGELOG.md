@@ -1,3 +1,10 @@
+## [0.8.1](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.8.0...v0.8.1) (2026-02-28)
+
+
+### Bug Fixes
+
+* resolve shellcheck findings and ban word in sanitization check ([d1b1ea8](https://github.com/techofourown/img-ourbox-matchbox/commit/d1b1ea8d7ed505169f6b6b1ab4842a344a31d560))
+
 # [0.8.0](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.7.0...v0.8.0) (2026-02-28)
 
 
