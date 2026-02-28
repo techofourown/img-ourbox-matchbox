@@ -20,5 +20,5 @@ build.log
 *.swp
 .DS_Store
 
-# Optional local overrides (keep repo defaults committed)
-tools/registry.env.local
+# Optional local overrides (gitignored; never commit internal values here)
+tools/local/

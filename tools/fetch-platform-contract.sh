@@ -2,10 +2,25 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REF_FILE="${ROOT}/contracts/platform-contract.ref"
 
-[[ -f "${REF_FILE}" ]] || { echo "Missing ${REF_FILE}" >&2; exit 1; }
-REF="$(cat "${REF_FILE}")"
+# Resolve platform contract ref.
+# Priority: OURBOX_PLATFORM_CONTRACT_REF env var > release/official-inputs.env > contracts/ (legacy fallback)
+if [[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]]; then
+  REF="${OURBOX_PLATFORM_CONTRACT_REF}"
+else
+  INPUTS_ENV="${ROOT}/release/official-inputs.env"
+  if [[ -f "${INPUTS_ENV}" ]]; then
+    # shellcheck disable=SC1090
+    source "${INPUTS_ENV}"
+    [[ -n "${PLATFORM_CONTRACT_REF:-}" ]] || { echo "PLATFORM_CONTRACT_REF not set in ${INPUTS_ENV}" >&2; exit 1; }
+    REF="${PLATFORM_CONTRACT_REF}"
+  else
+    # Legacy fallback: contracts/platform-contract.ref (deprecated — use release/official-inputs.env)
+    REF_FILE="${ROOT}/contracts/platform-contract.ref"
+    [[ -f "${REF_FILE}" ]] || { echo "Missing ${INPUTS_ENV} and no legacy ${REF_FILE} found" >&2; exit 1; }
+    REF="$(cat "${REF_FILE}")"
+  fi
+fi
 
 command -v oras >/dev/null 2>&1 || {
   echo "oras is required. Run ./tools/bootstrap-host.sh or install ORAS v${ORAS_VERSION:-1.3.0}." >&2

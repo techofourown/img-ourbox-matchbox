@@ -17,11 +17,12 @@ DEPLOY_DIR="${1:-deploy}"
 : "${OURBOX_VERSION:=dev}"
 : "${OURBOX_SKU:=TOO-OBX-MBX-BASE-001}"
 : "${OS_REPO:=ghcr.io/techofourown/ourbox-matchbox-os}"
-: "${OS_ARTIFACT_TYPE:=application/vnd.ourbox.matchbox.os-image.v1}"
+: "${OS_ARTIFACT_TYPE:=application/vnd.techofourown.ourbox.matchbox.os-image.v1}"
 : "${OS_CATALOG_TAG:=${OURBOX_TARGET}-catalog}"
 : "${OS_CHANNEL_TAGS:=${OURBOX_TARGET}-stable}"   # space-separated moving tags to update (e.g., "rpi-stable rpi-beta")
 : "${OS_REGISTRY_USERNAME:=}"
 : "${OS_REGISTRY_PASSWORD:=}"
+: "${OS_INCLUDE_BUILD_LOG:=0}"   # 1 to publish build.log as artifact attachment
 CATALOG_HEADER=$'channel\ttag\tcreated\tversion\tvariant\ttarget\tsku\tgit_sha\tplatform_contract_digest\tk3s_version\timg_sha256\tartifact_digest\tpinned_ref'
 
 IMG_XZ="$(ls -1t "${DEPLOY_DIR}"/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz 2>/dev/null | head -n 1 || true)"
@@ -47,7 +48,9 @@ EOF
 INFO="${DEPLOY_DIR}/${BASE}.info"
 BLOG="${DEPLOY_DIR}/build.log"
 [ -f "${INFO}" ] && cp "${INFO}" "${TMP}/os.info" || true
-[ -f "${BLOG}" ] && cp "${BLOG}" "${TMP}/build.log" || true
+if [[ "${OS_INCLUDE_BUILD_LOG}" == "1" ]]; then
+  [ -f "${BLOG}" ] && cp "${BLOG}" "${TMP}/build.log" || true
+fi
 
 CONTRACT_DIGEST_FILE="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-airgap-platform/files/opt/ourbox/airgap/platform/contract.digest"
 CONTRACT_ENV_FILE="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-airgap-platform/files/opt/ourbox/airgap/platform/contract.env"
@@ -84,6 +87,9 @@ OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}
 OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}
 OURBOX_PLATFORM_CONTRACT_CREATED=${OURBOX_PLATFORM_CONTRACT_CREATED:-unknown}
 K3S_VERSION=${K3S_VERSION}
+GITHUB_WORKFLOW=${GITHUB_WORKFLOW:-}
+GITHUB_RUN_ID=${GITHUB_RUN_ID:-}
+GITHUB_RUN_ATTEMPT=${GITHUB_RUN_ATTEMPT:-}
 EOF
 
 push_ref() {
@@ -93,6 +99,18 @@ push_ref() {
   local args=(
     "${ref}"
     --artifact-type "${OS_ARTIFACT_TYPE}"
+    --annotation "org.opencontainers.image.source=https://github.com/techofourown/img-ourbox-matchbox"
+    --annotation "org.opencontainers.image.revision=${GIT_SHA}"
+    --annotation "org.opencontainers.image.version=${OURBOX_VERSION}"
+    --annotation "org.opencontainers.image.created=${BUILD_TS}"
+    --annotation "techofourown.artifact.kind=os-image"
+    --annotation "techofourown.target=${OURBOX_TARGET}"
+    --annotation "techofourown.variant=${OURBOX_VARIANT}"
+    --annotation "techofourown.sku=${OURBOX_SKU}"
+    --annotation "techofourown.platform-contract.digest=${CONTRACT_DIGEST}"
+    --annotation "techofourown.build.workflow=${GITHUB_WORKFLOW:-local}"
+    --annotation "techofourown.build.run-id=${GITHUB_RUN_ID:-local}"
+    --annotation "techofourown.build.run-attempt=${GITHUB_RUN_ATTEMPT:-1}"
     "${TMP}/os.img.xz:application/octet-stream"
     "${TMP}/os.img.xz.sha256:text/plain"
     "${TMP}/os.meta.env:text/plain"
@@ -156,7 +174,7 @@ update_catalog() {
 
   log ">> Updating catalog: ${catalog_ref}"
   oras push "${catalog_ref}" \
-    --artifact-type "application/vnd.ourbox.matchbox.os-catalog.v1" \
+    --artifact-type "application/vnd.techofourown.ourbox.matchbox.os-catalog.v1" \
     "${catalog_file}:text/tab-separated-values"
 }
 

@@ -2,13 +2,19 @@
 set -euo pipefail
 
 # shellcheck disable=SC1091
-[ -f "$(dirname "$0")/registry.env" ] && source "$(dirname "$0")/registry.env"
-# shellcheck disable=SC1091
-[ -f "$(dirname "$0")/versions.env" ] && source "$(dirname "$0")/versions.env"
+[ -f "$(dirname "${BASH_SOURCE[0]}")/versions.env" ] && source "$(dirname "${BASH_SOURCE[0]}")/versions.env"
 
-: "${REGISTRY:=registry.benac.dev}"
-: "${REGISTRY_NAMESPACE:=ourbox}"
+# Safe public defaults — may be overridden by an untracked local file (never committed).
+: "${REGISTRY:=ghcr.io}"
+: "${REGISTRY_NAMESPACE:=techofourown}"
+: "${REGISTRY_CA_CERT:=}"
 : "${BUILDKIT_VERSION:=v0.23.2}"
+
+# Source optional local registry override (gitignored; never commit internal values).
+_local_reg="${OURBOX_LOCAL_REGISTRY_ENV:-$(dirname "${BASH_SOURCE[0]}")/local/registry.env}"
+# shellcheck disable=SC1090
+[[ -f "${_local_reg}" ]] && source "${_local_reg}"
+unset _local_reg
 
 if ! declare -F need_cmd >/dev/null 2>&1; then
   need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "missing required command: $1" >&2; exit 1; }; }

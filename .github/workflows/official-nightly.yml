@@ -1,0 +1,71 @@
+name: Official Nightly Build & Publish (Matchbox)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: official-nightly-matchbox
+  cancel-in-progress: false
+
+jobs:
+  build-publish:
+    runs-on: [self-hosted, ourbox-builder, matchbox-build]
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set nightly version
+        run: echo "OURBOX_VERSION=nightly-${GITHUB_SHA:0:12}" >> "${GITHUB_ENV}"
+
+      - name: Bootstrap host dependencies
+        run: sudo ./tools/bootstrap-host.sh
+
+      - name: Fetch pinned upstream inputs
+        run: ./tools/fetch-airgap-platform.sh
+
+      - name: Build OS image
+        run: sudo ./tools/build-image.sh
+        env:
+          OURBOX_TARGET: rpi
+          OURBOX_VARIANT: prod
+
+      - name: Build installer image
+        run: sudo ./tools/build-installer-image.sh
+        env:
+          OURBOX_TARGET: rpi
+          OURBOX_VARIANT: prod
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Publish OS artifact (official nightly)
+        run: ./tools/publish-os-artifact-official.sh nightly
+
+      - name: Publish installer artifact (official nightly)
+        run: ./tools/publish-installer-artifact-official.sh nightly
+
+      - name: Upload provenance outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provenance-nightly-${{ github.sha }}
+          path: |
+            deploy/os-artifact.ref
+            deploy/os-artifact.pinned.ref
+            deploy/os-artifact.digest
+            deploy/os-artifact.meta.env
+            deploy/installer-artifact.ref
+            deploy/installer-artifact.pinned.ref
+            deploy/installer-artifact.digest
+            deploy/installer-artifact.meta.env
+          if-no-files-found: warn
