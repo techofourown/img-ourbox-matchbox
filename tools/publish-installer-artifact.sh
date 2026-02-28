@@ -22,7 +22,8 @@ DEPLOY_DIR="${1:-deploy}"
 : "${INSTALLER_REGISTRY_PASSWORD:=}"
 : "${INSTALLER_INCLUDE_BUILD_LOG:=0}"   # 1 to publish build-installer.log as artifact attachment
 
-IMG_XZ="$(ls -1t "${DEPLOY_DIR}"/*installer-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz 2>/dev/null | head -n 1 || true)"
+# shellcheck disable=SC2012
+IMG_XZ="$(ls -1t "${DEPLOY_DIR}"/*installer-ourbox-matchbox-"${OURBOX_TARGET,,}"-*.img.xz 2>/dev/null | head -n 1 || true)"
 if [[ -z "${IMG_XZ}" || ! -f "${IMG_XZ}" ]]; then
   die "No ${DEPLOY_DIR}/*installer-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz found. Did the build finish?"
 fi
@@ -31,7 +32,7 @@ BASE="$(basename "${IMG_XZ}" .img.xz)"
 INSTALLER_IMMUTABLE_TAG="${INSTALLER_IMMUTABLE_TAG:-${BASE}}"
 
 TMP="$(mktemp -d)"
-trap "rm -rf '${TMP}'" EXIT
+trap 'rm -rf "${TMP}"' EXIT
 
 log "Preparing installer artifact payload for ${INSTALLER_REPO}"
 
@@ -44,9 +45,9 @@ EOF
 
 INFO="${DEPLOY_DIR}/${BASE}.info"
 BLOG="${DEPLOY_DIR}/build-installer.log"
-[ -f "${INFO}" ] && cp "${INFO}" "${TMP}/installer.info" || true
+if [ -f "${INFO}" ]; then cp "${INFO}" "${TMP}/installer.info"; fi
 if [[ "${INSTALLER_INCLUDE_BUILD_LOG}" == "1" ]]; then
-  [ -f "${BLOG}" ] && cp "${BLOG}" "${TMP}/build-installer.log" || true
+  if [ -f "${BLOG}" ]; then cp "${BLOG}" "${TMP}/build-installer.log"; fi
 fi
 
 GIT_SHA="$(git -C "${ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"

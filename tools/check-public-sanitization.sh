@@ -64,7 +64,26 @@ for pattern in "${!PATTERNS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 3. Warn if tools/local/ directory exists (should be gitignored, not tracked)
+# 3. Banned words — must not appear anywhere in tracked files
+# ---------------------------------------------------------------------------
+BANNED_WORDS=(
+  "centroid"
+)
+
+for word in "${BANNED_WORDS[@]}"; do
+  if git ls-files -z | xargs -0 grep -rilE "\b${word}\b" 2>/dev/null \
+      | grep -v "^tools/${THIS_SCRIPT}$" \
+      | grep -q .; then
+    matches="$(git ls-files -z | xargs -0 grep -rilE "\b${word}\b" 2>/dev/null \
+      | grep -v "^tools/${THIS_SCRIPT}$" | tr '\n' ' ')"
+    fail "Banned word '${word}' found in: ${matches}"
+  else
+    PASS=$((PASS + 1))
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# 4. Warn if tools/local/ directory exists (should be gitignored, not tracked)
 # ---------------------------------------------------------------------------
 if git ls-files | grep -q '^tools/local/'; then
   warn "tools/local/ files appear to be tracked by git — they should be gitignored."

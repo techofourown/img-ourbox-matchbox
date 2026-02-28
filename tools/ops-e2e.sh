@@ -449,6 +449,7 @@ newest_img_xz() {
   : "${OURBOX_TARGET:=rpi}"
   local img_glob="${ROOT}/deploy/img-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz"
   local img=""
+  # shellcheck disable=SC2012,SC2086
   img="$(ls -1t ${img_glob} 2>/dev/null | head -n 1 || true)"
   [[ -n "${img}" && -f "${img}" ]] || die "no ${img_glob} found; build likely failed"
 
@@ -467,7 +468,7 @@ compute_os_artifact_ref_from_img() {
   local img="$1"
   local base
   base="$(basename "${img}" .img.xz)"
-  echo "$(imgref os "${base}")"
+  imgref os "${base}"
 }
 
 main() {
@@ -499,7 +500,7 @@ main() {
   "${ROOT}/tools/fetch-airgap-platform.sh"
 
   if [[ -f "${ROOT}/artifacts/airgap/manifest.env" ]]; then
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1090,SC1091
     source "${ROOT}/artifacts/airgap/manifest.env"
     log "Airgap pins: ARCH=${AIRGAP_PLATFORM_ARCH:-?} K3S_VERSION=${K3S_VERSION:-?}"
   fi

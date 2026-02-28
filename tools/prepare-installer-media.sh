@@ -107,7 +107,7 @@ preferred_byid_for_disk() {
     [[ -z "${best}" ]] && best="${p}"
   done
 
-  [[ -n "${best}" ]] && echo "${best}" || true
+  if [[ -n "${best}" ]]; then echo "${best}"; fi
 }
 
 is_candidate_media_disk() {
@@ -240,7 +240,8 @@ if [[ "${BUILD_LOCAL}" == "1" ]]; then
   "${ROOT}/tools/fetch-airgap-platform.sh"
   OURBOX_TARGET="${OURBOX_TARGET}" OURBOX_VARIANT="${OURBOX_VARIANT}" OURBOX_VERSION="${OURBOX_VERSION}" "${ROOT}/tools/build-image.sh"
   OURBOX_TARGET="${OURBOX_TARGET}" OURBOX_VARIANT="${OURBOX_VARIANT}" OURBOX_VERSION="${OURBOX_VERSION}" "${ROOT}/tools/build-installer-image.sh"
-  installer_img="$(ls -1t "${ROOT}"/deploy/*installer-ourbox-matchbox-${OURBOX_TARGET,,}-*.img.xz 2>/dev/null | head -n 1 || true)"
+  # shellcheck disable=SC2012
+  installer_img="$(ls -1t "${ROOT}"/deploy/*installer-ourbox-matchbox-"${OURBOX_TARGET,,}"-*.img.xz 2>/dev/null | head -n 1 || true)"
 else
   : "${INSTALLER_OUTDIR:=${ROOT}/deploy-installer-from-registry}"
   log "Mode: pull published installer artifact from registry."
