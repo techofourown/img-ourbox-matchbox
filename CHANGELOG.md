@@ -1,3 +1,10 @@
+## [0.8.3](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.8.2...v0.8.3) (2026-03-01)
+
+
+### Bug Fixes
+
+* reclaim workspace ownership before checkout on self-hosted runner ([0472aea](https://github.com/techofourown/img-ourbox-matchbox/commit/0472aead778c008810eb0d9323ed2e2916b29c46))
+
 ## [0.8.2](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.8.1...v0.8.2) (2026-03-01)
 
 
