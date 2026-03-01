@@ -1,3 +1,10 @@
+## [0.8.6](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.8.5...v0.8.6) (2026-03-01)
+
+
+### Bug Fixes
+
+* use relative path for oras push in catalog update ([a06ff8d](https://github.com/techofourown/img-ourbox-matchbox/commit/a06ff8d3ba1835c96207793fa258009f7129078c))
+
 ## [0.8.5](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.8.4...v0.8.5) (2026-03-01)
 
 
