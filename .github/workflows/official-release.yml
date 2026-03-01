@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build-publish:
-    runs-on: [self-hosted, ourbox-builder, matchbox-build]
+    runs-on: [self-hosted, official-heavy, pi-image]
     timeout-minutes: 240
 
     steps:

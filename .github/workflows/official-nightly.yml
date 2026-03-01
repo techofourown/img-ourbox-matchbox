@@ -3,7 +3,6 @@ name: Official Nightly Build & Publish (Matchbox)
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +14,7 @@ concurrency:
 
 jobs:
   build-publish:
-    runs-on: [self-hosted, ourbox-builder, matchbox-build]
+    runs-on: [self-hosted, official-heavy, pi-image]
     timeout-minutes: 240
 
     steps:
