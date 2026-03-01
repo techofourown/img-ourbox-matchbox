@@ -14,15 +14,21 @@ concurrency:
 
 jobs:
   build-publish:
-    runs-on: [self-hosted, ourbox-builder, matchbox-build]
+    runs-on: [self-hosted, official-heavy, pi-image]
     timeout-minutes: 240
 
     steps:
+      - name: Fix workspace ownership from previous build
+        run: sudo chown -R "$(id -u):$(id -g)" "${GITHUB_WORKSPACE}" 2>/dev/null || true
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Bootstrap host dependencies
         run: sudo ./tools/bootstrap-host.sh
@@ -43,9 +49,6 @@ jobs:
           OURBOX_TARGET: rpi
           OURBOX_VARIANT: prod
           OURBOX_VERSION: ${{ github.ref_name }}
-
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Publish OS artifact (official release)
         run: ./tools/publish-os-artifact-official.sh release
