@@ -19,15 +19,21 @@ Model identifies the physical hardware class; SKU identifies the exact bill-of-m
 
 ## Status
 
-**Official installer artifacts are not yet published.** The build and release pipeline is complete,
-but no official builds have been run yet. The self-hosted builder (`ourbox-builder`/`matchbox-build`)
-needs to be online and registered before the first official build can happen.
+**Official nightly builds are live.** OS and installer artifacts are published automatically on
+every push to `main` via organization-controlled build infrastructure.
 
-Until then, the only working install path is a local source build (see below).
+| Channel | OS artifact | Installer artifact |
+|---|---|---|
+| Nightly | `ghcr.io/techofourown/ourbox-matchbox-os:rpi-nightly` | `ghcr.io/techofourown/ourbox-matchbox-installer:rpi-installer-nightly` |
+| Stable | `ghcr.io/techofourown/ourbox-matchbox-os:rpi-stable` | `ghcr.io/techofourown/ourbox-matchbox-installer:rpi-installer-stable` |
+
+Stable is promoted on `v*` tag push. All artifacts are digest-addressable OCI artifacts on GHCR.
+See [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) for official release channels,
+provenance metadata, and how to verify artifacts.
 
 ## Installing OurBox on a Raspberry Pi
 
-### Once official builds are available (future)
+### From official published artifacts (default)
 
 ```bash
 git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox.git
@@ -39,7 +45,7 @@ cd img-ourbox-matchbox
 `prepare-installer-media.sh` defaults to pulling the published `rpi-installer-stable` artifact
 from GHCR, verifying its checksum, and flashing your selected removable/USB media.
 
-### Now (local source build)
+### Local source build (maintainer / offline path)
 
 Requires: Linux desktop, sudo, Podman, ~30 min build time.
 

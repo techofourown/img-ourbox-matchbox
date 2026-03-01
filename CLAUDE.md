@@ -66,6 +66,24 @@ Each substage runs inside the pi-gen chroot:
 ### Container CLI Selection
 Scripts auto-detect the container runtime via `pick_container_cli()`: Podman (preferred) → Docker → nerdctl. Override with `DOCKER=` env var. All run rootful (sudo when not root).
 
+## Official Build Posture
+
+Official OS and installer artifacts are produced by organization-controlled build infrastructure
+per [ADR-0008](https://github.com/techofourown/org-techofourown/blob/main/docs/decisions/ADR-0008-adopt-organization-controlled-build-infrastructure-for-heavy-artifacts.md)
+and the [Official Artifact Build and Provenance Policy](https://github.com/techofourown/org-techofourown/blob/main/docs/policies/OFFICIAL_ARTIFACT_BUILD_AND_PROVENANCE_POLICY.md).
+
+- Official workflows (`official-nightly.yml`, `official-release.yml`) run on `[self-hosted, official-heavy, pi-image]` runners in the `official-heavy-artifacts` org runner group
+- Official artifacts are digest-addressable OCI artifacts; see `release/official-artifacts.env` for repos and channel tags
+- Upstream platform bundles are digest-pinned in `release/official-inputs.env` — update via PR when `sw-ourbox-os` ships new bundles
+- See `docs/ARTIFACT_PROVENANCE.md` for the required audit record (artifact types, release channels, provenance metadata, signature status)
+
+### Workflow safety check
+
+`tools/check-workflow-safety.sh` (run in CI via `ci.yml`) enforces two trust boundary rules:
+
+1. No workflow using a self-hosted runner may be triggered by `pull_request` or `pull_request_target` — prevents untrusted PR code from executing on privileged builders
+2. No official publish workflow (those calling `tools/*/publish.sh`) may expose `workflow_dispatch` — official publication must only flow from push-to-main or tag push
+
 ## Conventions
 
 - All shell scripts: `#!/usr/bin/env bash` + `set -euo pipefail`
