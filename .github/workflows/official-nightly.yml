@@ -31,6 +31,9 @@ jobs:
       - name: Set nightly version
         run: echo "OURBOX_VERSION=nightly-${GITHUB_SHA:0:12}" >> "${GITHUB_ENV}"
 
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
       - name: Bootstrap host dependencies
         run: sudo ./tools/bootstrap-host.sh
 
@@ -48,9 +51,6 @@ jobs:
         env:
           OURBOX_TARGET: rpi
           OURBOX_VARIANT: prod
-
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Publish OS artifact (official nightly)
         run: ./tools/publish-os-artifact-official.sh nightly
