@@ -112,15 +112,15 @@ push_ref() {
     --annotation "techofourown.build.workflow=${GITHUB_WORKFLOW:-local}"
     --annotation "techofourown.build.run-id=${GITHUB_RUN_ID:-local}"
     --annotation "techofourown.build.run-attempt=${GITHUB_RUN_ATTEMPT:-1}"
-    "${TMP}/os.img.xz:application/octet-stream"
-    "${TMP}/os.img.xz.sha256:text/plain"
-    "${TMP}/os.meta.env:text/plain"
+    "os.img.xz:application/octet-stream"
+    "os.img.xz.sha256:text/plain"
+    "os.meta.env:text/plain"
   )
-  [[ -f "${TMP}/os.info" ]] && args+=("${TMP}/os.info:text/plain")
-  [[ -f "${TMP}/build.log" ]] && args+=("${TMP}/build.log:text/plain")
+  [[ -f "${TMP}/os.info" ]] && args+=("os.info:text/plain")
+  [[ -f "${TMP}/build.log" ]] && args+=("build.log:text/plain")
   local out status digest
   set +e
-  out="$(oras push "${args[@]}" 2>&1)"
+  out="$(cd "${TMP}" && oras push "${args[@]}" 2>&1)"
   status=$?
   set -e
   printf '%s\n' "${out}"
