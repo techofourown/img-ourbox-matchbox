@@ -67,13 +67,45 @@ hidden build logic.
 
 ## Official release workflows
 
-| Workflow | File | Runner |
-|---|---|---|
-| Official nightly | `.github/workflows/official-nightly.yml` | `[self-hosted, official-heavy, pi-image]` |
-| Official release | `.github/workflows/official-release.yml` | `[self-hosted, official-heavy, pi-image]` |
+| Workflow | File | Runner | Trigger |
+|---|---|---|---|
+| Official nightly | `.github/workflows/official-nightly.yml` | `[self-hosted, official-heavy, pi-image]` | Push to `main` (source-filtered) |
+| Official release | `.github/workflows/official-release.yml` | `[self-hosted, official-heavy, pi-image]` | `v*` tag push (all changes) |
 
 Both run on organization-controlled build infrastructure in the `official-heavy-artifacts`
 runner group. Third-party hosted runners are not used for artifact publication.
+
+### Trigger filtering
+
+`official-nightly.yml` uses `paths-ignore` to skip publication for documentation-only changes.
+The following paths do not trigger a nightly build when changed:
+
+```
+docs/**
+README.md
+CLAUDE.md
+```
+
+All other paths are treated as potentially artifact-affecting and do trigger the nightly build.
+If a source change lands outside these ignored paths, it will trigger publication even if it
+does not materially affect the built image.
+
+`official-release.yml` is not filtered — it triggers on explicit `v*` tag push, which is
+always an intentional release act.
+
+### Forcing an official republish without source changes
+
+Touch `release/REVALIDATION_TRIGGER` in a PR. That file is not in the `paths-ignore` list,
+so merging a change to it will trigger `official-nightly.yml`. Use this when you need an
+official artifact after infrastructure maintenance or runner migration, without making a
+substantive code change. See `release/REVALIDATION_TRIGGER` for the documented procedure.
+
+### Non-publishing revalidation
+
+`.github/workflows/revalidate-matchbox-build.yml` runs the full build pipeline on the official
+builder weekly (Sunday 03:00 UTC) and on `workflow_dispatch`. It does NOT publish official
+artifacts. Use it to confirm the release-capable path works after infrastructure changes, per
+the ADR-0008 revalidation requirement.
 
 ---
 

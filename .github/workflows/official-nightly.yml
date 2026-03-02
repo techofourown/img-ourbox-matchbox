@@ -3,6 +3,10 @@ name: Official Nightly Build & Publish (Matchbox)
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CLAUDE.md'
 
 permissions:
   contents: read

@@ -1,0 +1,87 @@
+name: Revalidate Matchbox Build (non-publishing)
+# Runs the full Matchbox OS + installer build on the official builder to confirm
+# the release-capable path still works. Does NOT publish any official artifacts.
+# Use this after infrastructure changes, runner migrations, or to satisfy the
+# ADR-0008 revalidation requirement.
+#
+# For an actual official republish, touch release/REVALIDATION_TRIGGER in a PR instead.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0'   # Weekly, Sunday 03:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revalidate-matchbox
+  cancel-in-progress: false
+
+jobs:
+  revalidate:
+    runs-on: [self-hosted, official-heavy, pi-image]
+    timeout-minutes: 240
+
+    steps:
+      - name: Fix workspace ownership from previous build
+        run: sudo chown -R "$(id -u):$(id -g)" "${GITHUB_WORKSPACE}" 2>/dev/null || true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set revalidation version label
+        run: echo "OURBOX_VERSION=revalidation-${GITHUB_SHA:0:12}" >> "${GITHUB_ENV}"
+
+      - name: Login to GHCR (for fetching upstream inputs)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Bootstrap host dependencies
+        run: sudo ./tools/bootstrap-host.sh
+
+      - name: Fetch pinned upstream inputs
+        run: ./tools/fetch-airgap-platform.sh
+
+      - name: Build OS image
+        run: sudo ./tools/build-image.sh
+        env:
+          OURBOX_TARGET: rpi
+          OURBOX_VARIANT: prod
+
+      - name: Build installer image
+        run: sudo ./tools/build-installer-image.sh
+        env:
+          OURBOX_TARGET: rpi
+          OURBOX_VARIANT: prod
+
+      - name: Reclaim build output ownership
+        run: sudo chown -R "$(id -u):$(id -g)" deploy/
+
+      - name: Verify build outputs exist
+        run: |
+          set -euo pipefail
+          IMG="$(ls -1t deploy/img-ourbox-matchbox-rpi-*.img.xz 2>/dev/null | head -n1 || true)"
+          if [[ -z "${IMG}" ]]; then
+            echo "ERROR: no deploy/img-ourbox-matchbox-rpi-*.img.xz found" >&2
+            exit 1
+          fi
+          echo "OS image: ${IMG} ($(du -h "${IMG}" | cut -f1))"
+          INSTALLER="$(ls -1t deploy/img-ourbox-matchbox-rpi-installer-*.img.xz 2>/dev/null | head -n1 || true)"
+          if [[ -n "${INSTALLER}" ]]; then
+            echo "Installer: ${INSTALLER} ($(du -h "${INSTALLER}" | cut -f1))"
+          fi
+          echo "Revalidation build verified."
+
+      - name: Upload revalidation metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: revalidation-matchbox-${{ github.run_id }}
+          path: |
+            deploy/*.info
+            deploy/build.log
+            deploy/build-installer.log
+          if-no-files-found: warn

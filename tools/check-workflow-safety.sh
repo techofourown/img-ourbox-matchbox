@@ -6,6 +6,8 @@
 #      pull_request or pull_request_target (untrusted code on privileged builder).
 #   2. No official publish workflow may expose a broad workflow_dispatch trigger
 #      (official publication must only flow from push-to-main or tag push).
+#   3. Official publish workflows triggered by branch push must declare a path
+#      filter (paths-ignore or paths) to avoid rebuilding on docs-only changes.
 #
 # Run in CI on every PR and push to main.
 set -euo pipefail
@@ -60,6 +62,30 @@ while IFS= read -r wf; do
     fail "${name}: official publish workflow exposes workflow_dispatch — official publication must only trigger from push-to-main or tag push"
   else
     PASS=$((PASS + 1))
+  fi
+done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -name '*.yml' -o -name '*.yaml')
+
+# ---------------------------------------------------------------------------
+# Rule 3: official publish workflows on branch push must declare a path filter
+# ---------------------------------------------------------------------------
+while IFS= read -r wf; do
+  name="$(basename "${wf}")"
+
+  # Is this an official publish workflow?
+  if ! grep -qE 'publish-(os|installer)-artifact-official\.sh' "${wf}"; then
+    continue
+  fi
+
+  # Does it trigger on push to a branch?
+  if ! grep -qE '^\s+branches:' "${wf}"; then
+    continue
+  fi
+
+  # Must declare paths-ignore or paths to avoid rebuilding on docs-only changes.
+  if grep -qE '^\s+paths-ignore:' "${wf}" || grep -qE '^\s+paths:' "${wf}"; then
+    PASS=$((PASS + 1))
+  else
+    fail "${name}: official publish workflow triggers on branch push without a path filter — add paths-ignore to skip documentation-only changes"
   fi
 done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -name '*.yml' -o -name '*.yaml')
 
