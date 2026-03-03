@@ -1,3 +1,11 @@
+## [0.8.7](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.8.6...v0.8.7) (2026-03-03)
+
+
+### Bug Fixes
+
+* switch official-release trigger to release:published ([74d27b7](https://github.com/techofourown/img-ourbox-matchbox/commit/74d27b78d8293f7f12ee4f299ae915207fffc8ae))
+* tighten rule 4 — require exactly types:[published], nothing else ([876c4f1](https://github.com/techofourown/img-ourbox-matchbox/commit/876c4f11ccca53509993160486ced452d438219e))
+
 ## [0.8.6](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.8.5...v0.8.6) (2026-03-01)
 
 
