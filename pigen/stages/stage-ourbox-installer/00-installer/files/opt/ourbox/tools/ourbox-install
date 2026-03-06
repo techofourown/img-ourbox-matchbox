@@ -256,7 +256,10 @@ teardown_installer_ssh() {
 
   if id -u "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1; then
     passwd -l "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1 || true
-    rm -f "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh/authorized_keys" >/dev/null 2>&1 || true
+    local ssh_home=""
+    ssh_home="$(awk -F: -v u="${OURBOX_INSTALLER_SSH_USER}" '$1==u {print $6; exit}' /etc/passwd 2>/dev/null || true)"
+    [[ -n "${ssh_home}" ]] || ssh_home="/home/${OURBOX_INSTALLER_SSH_USER}"
+    rm -f "${ssh_home}/.ssh/authorized_keys" >/dev/null 2>&1 || true
   fi
 
   systemctl stop ssh >/dev/null 2>&1 || true
