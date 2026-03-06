@@ -2,16 +2,49 @@
 set -euo pipefail
 
 log(){ echo "[$(date -Is)] $*"; }
+die(){ echo "ERROR: $*" >&2; exit 1; }
+kubectl_cmd(){ /usr/local/bin/k3s kubectl --kubeconfig "${KUBECONFIG_PATH}" "$@"; }
 
 STATE_DIR="/var/lib/ourbox/state"
 MARKER="${STATE_DIR}/bootstrap.done"
+APPLIED_CONTRACT_STATE="${STATE_DIR}/platform-contract.env"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 HOSTNAME="$(hostname)"
+PLATFORM_CONTRACT_DIR="/opt/ourbox/airgap/platform"
+RENDER_DIR="/run/ourbox-platform-rendered"
+DESIRED_CONTRACT_STATE=""
 
-# idempotent
-if [[ -f "$MARKER" ]]; then
-  exit 0
-fi
+cleanup() {
+  if [[ -n "${DESIRED_CONTRACT_STATE}" && -f "${DESIRED_CONTRACT_STATE}" ]]; then
+    rm -f "${DESIRED_CONTRACT_STATE}"
+  fi
+}
+trap cleanup EXIT
+
+ensure_k3s_running() {
+  systemctl is-enabled --quiet k3s.service 2>/dev/null || systemctl enable k3s.service
+  systemctl is-active --quiet k3s.service 2>/dev/null || systemctl start k3s.service
+}
+
+resolve_desired_contract_state() {
+  DESIRED_CONTRACT_STATE="$(mktemp "${TMPDIR:-/tmp}/ourbox-platform-state.XXXXXX")"
+  "${PLATFORM_CONTRACT_DIR}/tools/contract-identity.sh" \
+    --contract-dir "${PLATFORM_CONTRACT_DIR}" \
+    --profile "${OURBOX_PLATFORM_PROFILE:-demo-apps}" \
+    --box-host "${OURBOX_BOX_HOST:-${HOSTNAME}.local}" \
+    --tls-mode "${OURBOX_TLS_MODE:-}" \
+    --ingress-class "${OURBOX_INGRESS_CLASS:-}" \
+    --storage-class "${OURBOX_STORAGE_CLASS:-}" \
+    > "${DESIRED_CONTRACT_STATE}"
+  # shellcheck disable=SC1090,SC1091
+  source "${DESIRED_CONTRACT_STATE}"
+}
+
+current_contract_matches() {
+  [[ -f "${MARKER}" ]] || return 1
+  [[ -f "${APPLIED_CONTRACT_STATE}" ]] || return 1
+  cmp -s "${APPLIED_CONTRACT_STATE}" "${DESIRED_CONTRACT_STATE}"
+}
 
 # hard requirement for product posture: don't bootstrap platform onto OS disk
 if ! mountpoint -q /var/lib/ourbox; then
@@ -23,11 +56,21 @@ mkdir -p \
   "$STATE_DIR" \
   "/var/lib/ourbox/device" \
   "/var/lib/ourbox/secrets" \
-  "/var/lib/ourbox/k3s/agent/images" \
-  "/var/lib/ourbox/share" \
-  "/var/lib/ourbox/flatnotes" \
-  "/var/lib/ourbox/todo-bloom" \
-  "/var/lib/ourbox/landing"
+  "/var/lib/ourbox/k3s/agent/images"
+
+resolve_desired_contract_state
+
+if current_contract_matches; then
+  log "Stored platform contract state matches shipped contract; ensuring k3s is running and skipping reapply"
+  ensure_k3s_running
+  exit 0
+fi
+
+if [[ -f "${MARKER}" ]]; then
+  log "Bootstrap marker exists but shipped contract state changed (or was never recorded); reapplying"
+fi
+
+"${PLATFORM_CONTRACT_DIR}/tools/check-target-prereqs.sh"
 
 # device_id (stable)
 if [[ ! -f /var/lib/ourbox/device/device_id ]]; then
@@ -41,10 +84,6 @@ if [[ ! -f /var/lib/ourbox/secrets/k3s_token ]]; then
   chmod 0600 /var/lib/ourbox/secrets/k3s_token
 fi
 TOKEN="$(cat /var/lib/ourbox/secrets/k3s_token)"
-
-log "Copying static files to DATA disk"
-cp -f /opt/ourbox/airgap/platform/todo-bloom/* /var/lib/ourbox/todo-bloom/
-cp -f /opt/ourbox/airgap/platform/landing/* /var/lib/ourbox/landing/
 
 # Write k3s config (data-dir on DATA disk)
 # CRITICAL: keep servicelb disabled — we use Traefik hostPort instead.
@@ -108,14 +147,13 @@ if [[ -f /sys/fs/cgroup/cgroup.controllers ]] && ! grep -qw memory /sys/fs/cgrou
 fi
 
 # Start k3s (enabled only after hydration prep)
-systemctl enable k3s.service
-systemctl start k3s.service
+ensure_k3s_running
 
 # Wait for kubeconfig + API
 log "Waiting for k3s kubeconfig + API..."
 for i in $(seq 1 600); do
   if [[ -f "${KUBECONFIG_PATH}" ]]; then
-    if /usr/local/bin/k3s kubectl --kubeconfig "${KUBECONFIG_PATH}" get nodes >/dev/null 2>&1; then
+    if kubectl_cmd get nodes >/dev/null 2>&1; then
       log "k3s API is up (after ${i}s)"
       break
     fi
@@ -135,16 +173,32 @@ for i in $(seq 1 600); do
 done
 
 # Final gate
-if ! /usr/local/bin/k3s kubectl --kubeconfig "${KUBECONFIG_PATH}" get nodes >/dev/null 2>&1; then
+if ! kubectl_cmd get nodes >/dev/null 2>&1; then
   echo "ERROR: k3s API never became ready. Recent logs:" >&2
   journalctl -u k3s --no-pager -n 200 >&2 || true
   exit 1
 fi
 
-# Apply platform manifests
-log "Applying platform manifests"
-/usr/local/bin/k3s kubectl --kubeconfig "${KUBECONFIG_PATH}" \
-  apply -f /opt/ourbox/airgap/platform/manifests
+log "Rendering upstream platform contract"
+rm -rf "${RENDER_DIR}"
+python3 "${PLATFORM_CONTRACT_DIR}/tools/render-contract.py" \
+  --contract-root "${PLATFORM_CONTRACT_DIR}" \
+  --output-dir "${RENDER_DIR}" \
+  --profile "${OURBOX_PLATFORM_PROFILE}" \
+  --box-host "${BOX_HOST}" \
+  --tls-mode "${TLS_MODE}" \
+  --ingress-class "${INGRESS_CLASS}" \
+  --storage-class "${STORAGE_CLASS}"
 
+log "Applying rendered platform manifests"
+kubectl_cmd apply -f "${RENDER_DIR}/manifests"
+
+log "Running upstream runtime verification"
+"${PLATFORM_CONTRACT_DIR}/tools/verify-runtime.sh" \
+  --kubeconfig "${KUBECONFIG_PATH}" \
+  --contract-dir "${PLATFORM_CONTRACT_DIR}" \
+  --render-dir "${RENDER_DIR}"
+
+install -D -m 0644 "${DESIRED_CONTRACT_STATE}" "${APPLIED_CONTRACT_STATE}"
 date -Is > "$MARKER"
 echo "OurBox bootstrap complete. device_id=${DEVICE_ID}"

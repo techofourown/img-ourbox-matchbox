@@ -22,21 +22,12 @@ SRC="${ROOT}/artifacts/platform-contract/extracted/platform-contract"
 
 STAGE_FILES="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-airgap-platform/files"
 DST_BASE="${STAGE_FILES}/opt/ourbox/airgap/platform"
-DST_MAN="${DST_BASE}/manifests"
-DST_LAND="${DST_BASE}/landing"
-DST_TODO="${DST_BASE}/todo-bloom"
 
-rm -rf "${DST_MAN}" "${DST_LAND}" "${DST_TODO}"
-mkdir -p "${DST_MAN}" "${DST_LAND}" "${DST_TODO}"
+rm -rf "${DST_BASE}"
+mkdir -p "${DST_BASE}"
 
-cp -a "${SRC}/manifests/." "${DST_MAN}/"
-cp -a "${SRC}/landing/." "${DST_LAND}/"
-if [[ -d "${SRC}/todo-bloom" ]]; then
-  cp -a "${SRC}/todo-bloom/." "${DST_TODO}/"
-fi
-cp -a "${SRC}/contract.env" "${DST_BASE}/contract.env"
+cp -a "${SRC}/." "${DST_BASE}/"
 printf '%s\n' "${DIGEST}" > "${DST_BASE}/contract.digest"
-touch "${DST_MAN}/.gitkeep" "${DST_LAND}/.gitkeep" "${DST_TODO}/.gitkeep"
 
 echo "Synced platform contract into pi-gen stage files:"
 echo "  ${DST_BASE}"
