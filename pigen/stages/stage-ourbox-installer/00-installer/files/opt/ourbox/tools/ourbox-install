@@ -56,7 +56,6 @@ CHANNEL_EXP_LABS_TAG=""
 INSTALL_DEFAULTS_APPLIED=0
 INSTALL_DEFAULTS_PROFILE=""
 SELECTED_REF=""
-SELECTED_TAG=""
 PAYLOAD_PATH=""
 PAYLOAD_SHA256=""
 PAYLOAD_META=""
@@ -269,6 +268,7 @@ load_payload_config() {
 load_remote_install_defaults() {
   INSTALL_DEFAULTS_APPLIED=0
   INSTALL_DEFAULTS_PROFILE=""
+  local baked_os_default_ref="${OS_DEFAULT_REF:-}"
 
   [[ -n "${INSTALL_DEFAULTS_REF}" ]] || return 0
 
@@ -308,6 +308,12 @@ load_remote_install_defaults() {
 
   normalize_payload_config
 
+  # A baked pinned default ref should remain authoritative unless the
+  # install-defaults profile explicitly replaces it with another non-empty ref.
+  if [[ -n "${baked_os_default_ref}" && -z "${OS_DEFAULT_REF}" ]]; then
+    OS_DEFAULT_REF="${baked_os_default_ref}"
+  fi
+
   INSTALL_DEFAULTS_APPLIED=1
   INSTALL_DEFAULTS_PROFILE="${profile}"
   log "Applied install-defaults profile for '${INSTALLER_ID}'."
@@ -345,7 +351,7 @@ ensure_oras() {
   install -m 0755 "${tmpdir}/oras" /usr/local/bin/oras
   trap - RETURN
   rm -rf "${tmpdir}"
-  log "ORAS installed: $(oras version 2>/dev/null | tr -d \"\r\")"
+  log "ORAS installed: $(oras version 2>/dev/null | tr -d "$(printf '\r')")"
 }
 
 maybe_oras_login() {
@@ -502,7 +508,7 @@ select_from_catalog() {
   echo "Catalog entries (${CATALOG_REF}):"
   local i=1
   for line in "${entries[@]}"; do
-    IFS=$'\t' read -r channel tag created version variant target sku gitsha contract k3s imgsha <<<"${line#*:}"
+    IFS=$'\t' read -r channel tag created version _variant _target _sku _gitsha contract _k3s _imgsha <<<"${line#*:}"
     printf "  %d) %-12s %-30s %s %s %s\n" "${i}" "${channel}" "${tag}" "${version}" "${created}" "${contract}"
     i=$((i+1))
   done
@@ -516,8 +522,7 @@ select_from_catalog() {
     return 1
   fi
   local chosen="${entries[$((pick-1))]}"
-  IFS=$'\t' read -r channel tag created version variant target sku gitsha contract k3s imgsha <<<"${chosen#*:}"
-  SELECTED_TAG="${tag}"
+  IFS=$'\t' read -r channel tag created version _variant _target _sku _gitsha contract _k3s _imgsha <<<"${chosen#*:}"
   SELECTED_REF="${OS_REPO}:${tag}"
   log "Selected ${SELECTED_REF} (channel=${channel}, version=${version}, contract=${contract})"
   return 0

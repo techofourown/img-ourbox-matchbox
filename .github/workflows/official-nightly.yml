@@ -49,17 +49,28 @@ jobs:
           OURBOX_TARGET: rpi
           OURBOX_VARIANT: prod
 
-      - name: Build installer image
-        run: sudo ./tools/build-installer-image.sh
-        env:
-          OURBOX_TARGET: rpi
-          OURBOX_VARIANT: prod
-
       - name: Reclaim build output ownership
         run: sudo chown -R "$(id -u):$(id -g)" deploy/
 
       - name: Publish OS artifact (official nightly)
         run: ./tools/publish-os-artifact-official.sh nightly
+
+      - name: Resolve installer default OS ref
+        run: |
+          set -euo pipefail
+          echo "OS_DEFAULT_REF=$(cat deploy/os-artifact.pinned.ref)" >> "${GITHUB_ENV}"
+
+      - name: Build installer image
+        run: sudo ./tools/build-installer-image.sh
+        env:
+          OURBOX_TARGET: rpi
+          OURBOX_VARIANT: prod
+          OS_REPO: ghcr.io/techofourown/ourbox-matchbox-os
+          OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
+          INSTALL_DEFAULTS_REF: ""
+
+      - name: Reclaim installer output ownership
+        run: sudo chown -R "$(id -u):$(id -g)" deploy/
 
       - name: Publish installer artifact (official nightly)
         run: ./tools/publish-installer-artifact-official.sh nightly

@@ -4,6 +4,8 @@
 - Config shipped in image: `/opt/ourbox/installer/defaults.env`
 - Optional override on boot media: `/boot/firmware/ourbox-installer.env`
 
+`defaults.env` is rendered at installer image build time. It is not a static checked-in runtime file.
+
 Key variables:
 - `INSTALL_DEFAULTS_REF` (default `ghcr.io/techofourown/sw-ourbox-os/install-defaults:stable`)
 - `INSTALLER_ID` (`matchbox`)
@@ -29,6 +31,7 @@ Key variables:
 - Installer loads baked defaults, then attempts to pull `${INSTALL_DEFAULTS_REF}` and apply `defaults/${INSTALLER_ID}.env`.
 - If remote defaults pull fails, installer falls back to baked defaults.
 - Boot-media override (`/boot/firmware/ourbox-installer.env`) is applied last and wins.
+- A non-empty baked `OS_DEFAULT_REF` remains in force unless remote install-defaults explicitly replaces it with another non-empty ref.
 - Default action order:
   1) `OS_REF` (if set)
   2) `OS_DEFAULT_REF` (if set)
@@ -39,6 +42,10 @@ Key variables:
   - `r` enter custom ref (tag or digest)
   - `o` override OS payload repo/tag defaults interactively
 - Installer boot waits for `network-online.target` and bootstraps ORAS if missing.
+
+## Official builds
+- Official Matchbox workflows now publish the OS artifact first, then build the installer with that exact digest-pinned OS ref baked into `OS_DEFAULT_REF`.
+- Official installers bake `INSTALL_DEFAULTS_REF=''` for deterministic default installs; operators can still override via `/boot/firmware/ourbox-installer.env`.
 
 ## Catalog TSV
 - Tag: `${OS_TARGET}-catalog`
