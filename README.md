@@ -14,6 +14,8 @@ Model identifies the physical hardware class; SKU identifies the exact bill-of-m
 
 ## Docs
 
+- Upstream platform producer: [`sw-ourbox-os`](https://github.com/techofourown/sw-ourbox-os)
+- Platform contract consumption: [`docs/reference/platform-contract.md`](./docs/reference/platform-contract.md)
 - Operator runbook: [`docs/OPS.md`](./docs/OPS.md)
 - Contracts reference: [`docs/reference/contracts.md`](./docs/reference/contracts.md)
 
