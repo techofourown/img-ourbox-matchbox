@@ -20,6 +20,8 @@ SRC="${ROOT}/artifacts/platform-contract/extracted/platform-contract"
   exit 1
 }
 
+"${ROOT}/tools/validate-platform-contract-shape.sh" "${SRC}"
+
 STAGE_FILES="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-airgap-platform/files"
 DST_BASE="${STAGE_FILES}/opt/ourbox/airgap/platform"
 

@@ -57,6 +57,8 @@ tar -xzf "${TARBALL}" -C "${EXTRACT_DIR}"
   exit 1
 }
 
+"${ROOT}/tools/validate-platform-contract-shape.sh" "${EXTRACT_DIR}/platform-contract"
+
 if [[ -n "${RESOLVED_DIGEST}" ]]; then
   printf '%s\n' "${RESOLVED_DIGEST}" > "${EXTRACT_DIR}/platform-contract/contract.digest"
 fi
