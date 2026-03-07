@@ -78,6 +78,12 @@ jobs:
       - name: Reclaim installer output ownership
         run: sudo chown -R "$(id -u):$(id -g)" deploy/
 
+      - name: Smoke check baked installer defaults
+        run: ./tools/check-installer-defaults-smoke.sh
+        env:
+          OURBOX_TARGET: rpi
+          EXPECTED_OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
+
       - name: Publish installer artifact (official nightly)
         run: ./tools/publish-installer-artifact-official.sh nightly
 
@@ -95,4 +101,6 @@ jobs:
             deploy/installer-artifact.pinned.ref
             deploy/installer-artifact.digest
             deploy/installer-artifact.meta.env
+            deploy/installer-defaults.extracted.env
+            deploy/installer-defaults-smoke.txt
           if-no-files-found: warn
