@@ -1,3 +1,10 @@
+## [0.9.2](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.1...v0.9.2) (2026-03-07)
+
+
+### Bug Fixes
+
+* **platform:** pin full-shape contract and guard extracted shape ([efd6617](https://github.com/techofourown/img-ourbox-matchbox/commit/efd66170ab14f8bd61c3237be7d74ac60e7a25ed))
+
 ## [0.9.1](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.0...v0.9.1) (2026-03-06)
 
 
