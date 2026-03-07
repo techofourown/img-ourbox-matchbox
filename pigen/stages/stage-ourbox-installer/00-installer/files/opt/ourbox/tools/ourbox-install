@@ -150,6 +150,7 @@ load_payload_config() {
 load_remote_install_defaults() {
   INSTALL_DEFAULTS_APPLIED=0
   INSTALL_DEFAULTS_PROFILE=""
+  local baked_os_default_ref="${OS_DEFAULT_REF:-}"
 
   [[ -n "${INSTALL_DEFAULTS_REF}" ]] || return 0
 
@@ -189,6 +190,12 @@ load_remote_install_defaults() {
 
   normalize_payload_config
 
+  # A baked pinned default ref should remain authoritative unless the
+  # install-defaults profile explicitly replaces it with another non-empty ref.
+  if [[ -n "${baked_os_default_ref}" && -z "${OS_DEFAULT_REF}" ]]; then
+    OS_DEFAULT_REF="${baked_os_default_ref}"
+  fi
+
   INSTALL_DEFAULTS_APPLIED=1
   INSTALL_DEFAULTS_PROFILE="${profile}"
   log "Applied install-defaults profile for '${INSTALLER_ID}'."
@@ -226,7 +233,7 @@ ensure_oras() {
   install -m 0755 "${tmpdir}/oras" /usr/local/bin/oras
   trap - RETURN
   rm -rf "${tmpdir}"
-  log "ORAS installed: $(oras version 2>/dev/null | tr -d '\r')"
+  log "ORAS installed: $(oras version 2>/dev/null | tr -d "$(printf '\r')")"
 }
 
 maybe_oras_login() {

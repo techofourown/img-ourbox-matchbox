@@ -77,3 +77,7 @@ Publication targets and upstream input pins are repo-defined in `release/`:
 
 - `release/official-artifacts.env` — official GHCR repos and channel names
 - `release/official-inputs.env` — digest-pinned upstream refs (update via PR when `sw-ourbox-os` ships new bundles)
+
+Official Matchbox installer builds publish the OS artifact first and then bake that exact pinned
+OS payload ref into the installer defaults, so the published installer and its default install
+target stay on the same lane.
