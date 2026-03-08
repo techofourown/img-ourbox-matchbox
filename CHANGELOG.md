@@ -1,3 +1,10 @@
+## [0.9.4](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.3...v0.9.4) (2026-03-08)
+
+
+### Bug Fixes
+
+* **installer:** validate sshd with temporary host keys ([f5c9e63](https://github.com/techofourown/img-ourbox-matchbox/commit/f5c9e63ea0f0aa6e51108b2efeacdd98c4c63051))
+
 ## [0.9.3](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.2...v0.9.3) (2026-03-07)
 
 
