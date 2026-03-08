@@ -197,7 +197,17 @@ chmod 0755 /opt/ourbox/tools/ourbox-install
 chmod 0644 /opt/ourbox/tools/lib.sh
 
 install -d -m 0755 /run/sshd
-sshd -t >/dev/null
+test_hostkey_dir="$(mktemp -d)"
+cleanup_test_hostkeys() {
+  rm -rf "${test_hostkey_dir}"
+}
+trap cleanup_test_hostkeys EXIT
+ssh-keygen -q -t ed25519 -N '' -f "${test_hostkey_dir}/ssh_host_ed25519_key" >/dev/null
+sshd -t \
+  -o "HostKey=${test_hostkey_dir}/ssh_host_ed25519_key" \
+  >/dev/null
+trap - EXIT
+cleanup_test_hostkeys
 
 systemctl enable ssh
 systemctl enable ourbox-installer.service
