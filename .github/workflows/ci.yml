@@ -38,6 +38,16 @@ jobs:
             bash -n "${f}" && echo "OK: ${f}"
           done
 
+  resolver-sync:
+    name: Vendored resolver sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify vendored installer-selection resolver
+        run: bash tools/check-vendored-installer-selection-resolver.sh
+
   workflow-safety:
     name: Workflow trust boundary check
     runs-on: ubuntu-latest

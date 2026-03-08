@@ -5,17 +5,18 @@ set -euo pipefail
 # Consumers may vendor this file into target-specific installer images, but the
 # contract and reference implementation are defined here.
 
-if ! command -v log >/dev/null 2>&1; then
-  log() { printf '[%s] %s\n' "$(date -Is)" "$*"; }
-fi
+ourbox_selection_log() {
+  printf '[%s] %s\n' "$(date -Is)" "$*" >&2
+}
 
-if ! command -v die >/dev/null 2>&1; then
-  die() { log "ERROR: $*"; exit 1; }
-fi
+ourbox_selection_die() {
+  ourbox_selection_log "ERROR: $*"
+  exit 1
+}
 
-if ! command -v need_cmd >/dev/null 2>&1; then
-  need_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
-fi
+ourbox_selection_need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || ourbox_selection_die "missing required command: $1"
+}
 
 ourbox_selection_reset_state() {
   OURBOX_INSTALL_DEFAULTS_SOURCE="baked"
@@ -58,7 +59,7 @@ ourbox_selection_channel_tag() {
     exp-labs) tag="${CHANNEL_EXP_LABS_TAG:-}"; [[ -n "${tag}" ]] || tag="${target}-exp-labs" ;;
     *) tag="${target}-${channel}" ;;
   esac
-  [[ -n "${tag}" ]] || die "unable to resolve channel tag for '${channel}'"
+  [[ -n "${tag}" ]] || ourbox_selection_die "unable to resolve channel tag for '${channel}'"
   printf '%s\n' "${tag}"
 }
 
@@ -74,13 +75,13 @@ ourbox_selection_load_remote_install_defaults() {
 
   [[ -n "${INSTALL_DEFAULTS_REF:-}" ]] || return 0
 
-  need_cmd oras
+  ourbox_selection_need_cmd oras
   rm -rf "${pull_dir}" "${extract_dir}"
   mkdir -p "${pull_dir}" "${extract_dir}"
 
-  log "Pulling installer defaults: ${INSTALL_DEFAULTS_REF}"
+  ourbox_selection_log "Pulling installer defaults: ${INSTALL_DEFAULTS_REF}"
   if ! oras pull "${INSTALL_DEFAULTS_REF}" -o "${pull_dir}" >/dev/null 2>&1; then
-    log "Install defaults pull failed; using baked defaults."
+    ourbox_selection_log "Install defaults pull failed; using baked defaults."
     return 0
   fi
 
@@ -91,27 +92,27 @@ ourbox_selection_load_remote_install_defaults() {
     tarball="$(find "${pull_dir}" -maxdepth 4 -type f -name 'install-defaults.tar.gz' | head -n 1 || true)"
   fi
   [[ -n "${tarball}" && -f "${tarball}" ]] || {
-    log "Install defaults artifact missing tarball; using baked defaults."
+    ourbox_selection_log "Install defaults artifact missing tarball; using baked defaults."
     return 0
   }
 
   if ! tar -xzf "${tarball}" -C "${extract_dir}" >/dev/null 2>&1; then
-    log "Install defaults tar extraction failed; using baked defaults."
+    ourbox_selection_log "Install defaults tar extraction failed; using baked defaults."
     return 0
   fi
 
   [[ -f "${extract_dir}/install-defaults/schema.env" ]] || {
-    log "Install defaults artifact missing schema.env; using baked defaults."
+    ourbox_selection_log "Install defaults artifact missing schema.env; using baked defaults."
     return 0
   }
   [[ -f "${extract_dir}/install-defaults/manifest.env" ]] || {
-    log "Install defaults artifact missing manifest.env; using baked defaults."
+    ourbox_selection_log "Install defaults artifact missing manifest.env; using baked defaults."
     return 0
   }
 
   local profile="${extract_dir}/install-defaults/defaults/${expected_installer_id}.env"
   if [[ ! -f "${profile}" ]]; then
-    log "No install-defaults profile for installer '${expected_installer_id}'; using baked defaults."
+    ourbox_selection_log "No install-defaults profile for installer '${expected_installer_id}'; using baked defaults."
     return 0
   fi
 
@@ -137,18 +138,22 @@ ourbox_selection_load_remote_install_defaults() {
   OURBOX_INSTALL_DEFAULTS_SOURCE="remote"
   # shellcheck disable=SC2034  # output state consumed by the sourcing installer
   OURBOX_INSTALL_DEFAULTS_PROFILE="${profile}"
-  log "Applied install-defaults profile for '${expected_installer_id}'."
+  ourbox_selection_log "Applied install-defaults profile for '${expected_installer_id}'."
 }
 
 ourbox_selection_pull_catalog() {
   local dst="$1"
   local ref="${OS_REPO}:${OS_CATALOG_TAG}"
 
-  need_cmd oras
+  if [[ "${OS_CATALOG_ENABLED:-1}" != "1" ]]; then
+    return 1
+  fi
+
+  ourbox_selection_need_cmd oras
   rm -rf "${dst}"
   mkdir -p "${dst}"
 
-  log "Pulling catalog: ${ref}"
+  ourbox_selection_log "Pulling catalog: ${ref}"
   if ! oras pull "${ref}" -o "${dst}" >/dev/null 2>&1; then
     return 1
   fi
@@ -232,9 +237,9 @@ ourbox_selection_determine_default_ref() {
         OURBOX_SELECTED_REF="${catalog_ref}"
         return 0
       fi
-      log "Catalog has no valid digest-pinned entry for channel '${OS_CHANNEL}'; falling back to channel tag."
+      ourbox_selection_log "Catalog has no valid digest-pinned entry for channel '${OS_CHANNEL}'; falling back to channel tag."
     else
-      log "Catalog unavailable; falling back to channel tag."
+      ourbox_selection_log "Catalog unavailable; falling back to channel tag."
     fi
   fi
 
@@ -271,10 +276,10 @@ ourbox_selection_finalize_registry_ref() {
 
   if ! ourbox_selection_is_clean_single_line_ref "${selected_ref}"; then
     printf -v selected_ref_q '%q' "${selected_ref}"
-    die "invalid selected OS artifact ref (must be non-empty, single-line, no whitespace): ${selected_ref_q}"
+    ourbox_selection_die "invalid selected OS artifact ref (must be non-empty, single-line, no whitespace): ${selected_ref_q}"
   fi
 
-  need_cmd oras
+  ourbox_selection_need_cmd oras
 
   # shellcheck disable=SC2034  # output state consumed by the sourcing installer
   OURBOX_SELECTED_REF="${selected_ref}"
@@ -290,19 +295,19 @@ ourbox_selection_finalize_registry_ref() {
     return 0
   fi
 
-  log "Resolving to immutable digest: ${selected_ref}"
+  ourbox_selection_log "Resolving to immutable digest: ${selected_ref}"
   if resolved_digest="$(oras resolve "${selected_ref}" 2>/dev/null)" \
     && [[ "${resolved_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
     OURBOX_OS_ARTIFACT_DIGEST="${resolved_digest}"
     repo_base="$(ourbox_selection_ref_repo_base "${selected_ref}")"
     OURBOX_PULL_REF="${repo_base}@${resolved_digest}"
-    log "Resolved: ${resolved_digest}"
+    ourbox_selection_log "Resolved: ${resolved_digest}"
     return 0
   fi
 
   if [[ "${OURBOX_ALLOW_UNRESOLVED_PULL:-0}" == "1" ]]; then
-    log "WARNING: oras resolve failed; pulling by tag (OURBOX_ALLOW_UNRESOLVED_PULL=1)"
-    log "WARNING: artifact identity will not be captured in provenance"
+    ourbox_selection_log "WARNING: oras resolve failed; pulling by tag (OURBOX_ALLOW_UNRESOLVED_PULL=1)"
+    ourbox_selection_log "WARNING: artifact identity will not be captured in provenance"
     # shellcheck disable=SC2034  # output state consumed by the sourcing installer
     OURBOX_OS_ARTIFACT_DIGEST="unresolved"
     # shellcheck disable=SC2034  # output state consumed by the sourcing installer
@@ -310,7 +315,7 @@ ourbox_selection_finalize_registry_ref() {
     return 0
   fi
 
-  die "Cannot establish artifact identity: oras resolve failed for ${selected_ref}
+  ourbox_selection_die "Cannot establish artifact identity: oras resolve failed for ${selected_ref}
   The installer requires a digest-pinned artifact ref to ensure provenance.
   Options:
     1. Use a digest-pinned ref (catalog or OS_DEFAULT_REF usually provides this)

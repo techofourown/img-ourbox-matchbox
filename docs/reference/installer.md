@@ -32,6 +32,8 @@ Key variables:
 ## Runtime UX
 - Shared selection policy is sourced from `/opt/ourbox/tools/installer-selection-resolver.sh`, the
   upstream reference resolver defined in `sw-ourbox-os`.
+- The vendored resolver copy is checked in CI against the upstream revision recorded in
+  `tools/installer-selection-resolver.upstream.env`.
 - Installer loads baked defaults, then attempts to pull `${INSTALL_DEFAULTS_REF}` and apply `defaults/${INSTALLER_ID}.env`.
 - If remote defaults pull fails, installer falls back to baked defaults.
 - Boot-media override (`/boot/firmware/ourbox-installer.env`) is applied last and wins.
