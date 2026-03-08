@@ -1,3 +1,11 @@
+## [0.9.5](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.4...v0.9.5) (2026-03-08)
+
+
+### Bug Fixes
+
+* **installer:** sync resolver stderr hardening ([f426e21](https://github.com/techofourown/img-ourbox-matchbox/commit/f426e21bf320f1db5edb35e515024483c4f3ccc7))
+* **installer:** sync shared selection resolver fixes ([9ee1e43](https://github.com/techofourown/img-ourbox-matchbox/commit/9ee1e43dc4f3f0b1d0bc90d44aaf3ad49662d1b0))
+
 ## [0.9.4](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.3...v0.9.4) (2026-03-08)
 
 
