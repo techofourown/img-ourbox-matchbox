@@ -49,13 +49,17 @@ ourbox_selection_is_digest_pinned_ref() {
 
 ourbox_selection_channel_tag() {
   local channel="${1:-}"
+  local target="${OS_TARGET:-}"
+  local tag=""
   case "${channel}" in
-    stable) printf '%s\n' "${CHANNEL_STABLE_TAG}" ;;
-    beta) printf '%s\n' "${CHANNEL_BETA_TAG}" ;;
-    nightly) printf '%s\n' "${CHANNEL_NIGHTLY_TAG}" ;;
-    exp-labs) printf '%s\n' "${CHANNEL_EXP_LABS_TAG}" ;;
-    *) printf '%s\n' "${OS_TARGET}-${channel}" ;;
+    stable) tag="${CHANNEL_STABLE_TAG:-}"; [[ -n "${tag}" ]] || tag="${target}-stable" ;;
+    beta) tag="${CHANNEL_BETA_TAG:-}"; [[ -n "${tag}" ]] || tag="${target}-beta" ;;
+    nightly) tag="${CHANNEL_NIGHTLY_TAG:-}"; [[ -n "${tag}" ]] || tag="${target}-nightly" ;;
+    exp-labs) tag="${CHANNEL_EXP_LABS_TAG:-}"; [[ -n "${tag}" ]] || tag="${target}-exp-labs" ;;
+    *) tag="${target}-${channel}" ;;
   esac
+  [[ -n "${tag}" ]] || die "unable to resolve channel tag for '${channel}'"
+  printf '%s\n' "${tag}"
 }
 
 ourbox_selection_load_remote_install_defaults() {
@@ -159,17 +163,25 @@ ourbox_selection_catalog_entries() {
   [[ -f "${catalog_tsv}" ]] || return 1
 
   awk -F'\t' '
-    NR == 1 { next }
-    NF >= 13 {
-      pinned = $(NF)
-      created = $3
+    NR == 1 {
+      for (i = 1; i <= NF; i++) {
+        idx[$i] = i
+      }
+      if (!idx["channel"] || !idx["tag"] || !idx["created"] || !idx["version"] || !idx["platform_contract_digest"] || !idx["pinned_ref"]) {
+        exit 0
+      }
+      next
+    }
+    {
+      pinned = $(idx["pinned_ref"])
+      created = $(idx["created"])
       if (created == "") {
         next
       }
       if (pinned !~ /^[^[:space:]]+@sha256:[0-9a-f]{64}$/) {
         next
       }
-      print $1 "\t" $2 "\t" created "\t" $4 "\t" $9 "\t" pinned
+      print $(idx["channel"]) "\t" $(idx["tag"]) "\t" created "\t" $(idx["version"]) "\t" $(idx["platform_contract_digest"]) "\t" pinned
     }
   ' "${catalog_tsv}" | sort -t $'\t' -k3,3r -k2,2r
 }
@@ -233,6 +245,24 @@ ourbox_selection_determine_default_ref() {
   OURBOX_SELECTED_REF="${channel_tag_ref}"
 }
 
+ourbox_selection_ref_repo_base() {
+  local ref="$1"
+  local tail="${ref##*/}"
+
+  if [[ "${ref}" == *@* ]]; then
+    printf '%s\n' "${ref%%@*}"
+    return 0
+  fi
+
+  # Registry ports live before the last slash and must be preserved. Only the
+  # tag separator in the final path segment should be removed here.
+  if [[ "${tail}" == *:* ]]; then
+    printf '%s\n' "${ref%:*}"
+  else
+    printf '%s\n' "${ref}"
+  fi
+}
+
 ourbox_selection_finalize_registry_ref() {
   local selected_ref="$1"
   local selected_ref_q=""
@@ -264,9 +294,7 @@ ourbox_selection_finalize_registry_ref() {
   if resolved_digest="$(oras resolve "${selected_ref}" 2>/dev/null)" \
     && [[ "${resolved_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
     OURBOX_OS_ARTIFACT_DIGEST="${resolved_digest}"
-    # Use % (shortest suffix match) so refs containing a registry port are
-    # handled correctly, e.g. localhost:5000/repo/image:tag.
-    repo_base="${selected_ref%:*}"
+    repo_base="$(ourbox_selection_ref_repo_base "${selected_ref}")"
     OURBOX_PULL_REF="${repo_base}@${resolved_digest}"
     log "Resolved: ${resolved_digest}"
     return 0
