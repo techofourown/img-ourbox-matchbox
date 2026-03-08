@@ -1,3 +1,15 @@
+# [0.10.0](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.5...v0.10.0) (2026-03-08)
+
+
+### Bug Fixes
+
+* **release:** tighten nightly and exp-labs triggers ([df400a3](https://github.com/techofourown/img-ourbox-matchbox/commit/df400a35bd8ac2cd79883cb9cc7a0adf27d1bb43))
+
+
+### Features
+
+* **release:** adopt promote-first official channels ([547c01d](https://github.com/techofourown/img-ourbox-matchbox/commit/547c01d513b8dfa08d1bbe4e59949d419fbcd525))
+
 ## [0.9.5](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.9.4...v0.9.5) (2026-03-08)
 
 
