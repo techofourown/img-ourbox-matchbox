@@ -1,0 +1,62 @@
+name: Official Promote Stable (Matchbox)
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: official-promote-stable-matchbox-${{ github.event.release.tag_name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: startsWith(github.event.release.tag_name, 'v') && !github.event.release.draft && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name }}
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive
+
+      - name: Install ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Promote OS artifact to stable
+        run: ./tools/promote-os-artifact-official.sh stable
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+      - name: Promote installer artifact to stable
+        run: ./tools/promote-installer-artifact-official.sh stable
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+      - name: Upload provenance outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provenance-stable-${{ github.event.release.tag_name }}
+          path: |
+            deploy/os-artifact.ref
+            deploy/os-artifact.pinned.ref
+            deploy/os-artifact.digest
+            deploy/os-artifact.meta.env
+            deploy/os-artifact.promote.source.ref
+            deploy/installer-artifact.ref
+            deploy/installer-artifact.pinned.ref
+            deploy/installer-artifact.digest
+            deploy/installer-artifact.meta.env
+            deploy/installer-artifact.promote.source.ref
+          if-no-files-found: warn

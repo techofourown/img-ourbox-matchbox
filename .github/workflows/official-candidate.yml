@@ -1,4 +1,4 @@
-name: Official Nightly Build & Publish (Matchbox)
+name: Official Candidate Build & Publish (Matchbox)
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: official-nightly-matchbox
+  group: official-candidate-matchbox
   cancel-in-progress: false
 
 jobs:
@@ -31,22 +31,16 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Set nightly version
-        run: echo "OURBOX_VERSION=nightly-${GITHUB_SHA:0:12}" >> "${GITHUB_ENV}"
-
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Resolve latest nightly upstream inputs
-        run: |
-          set -euo pipefail
-          echo "OURBOX_PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge)" >> "${GITHUB_ENV}"
-          echo "OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-arm64)" >> "${GITHUB_ENV}"
+      - name: Set build identity
+        run: echo "OURBOX_VERSION=main-${GITHUB_SHA:0:12}" >> "${GITHUB_ENV}"
 
       - name: Bootstrap host dependencies
         run: sudo ./tools/bootstrap-host.sh
 
-      - name: Fetch pinned upstream inputs
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Fetch curated upstream inputs
         run: ./tools/fetch-airgap-platform.sh
 
       - name: Build OS image
@@ -58,8 +52,8 @@ jobs:
       - name: Reclaim build output ownership
         run: sudo chown -R "$(id -u):$(id -g)" deploy/
 
-      - name: Publish OS artifact (official nightly)
-        run: ./tools/publish-os-artifact-official.sh nightly
+      - name: Publish OS artifact (official beta)
+        run: ./tools/publish-os-artifact-official.sh beta
 
       - name: Resolve installer default OS ref
         run: |
@@ -84,14 +78,14 @@ jobs:
           OURBOX_TARGET: rpi
           EXPECTED_OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
 
-      - name: Publish installer artifact (official nightly)
-        run: ./tools/publish-installer-artifact-official.sh nightly
+      - name: Publish installer artifact (official beta)
+        run: ./tools/publish-installer-artifact-official.sh beta
 
       - name: Upload provenance outputs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: provenance-nightly-${{ github.sha }}
+          name: provenance-candidate-${{ github.sha }}
           path: |
             deploy/os-artifact.ref
             deploy/os-artifact.pinned.ref

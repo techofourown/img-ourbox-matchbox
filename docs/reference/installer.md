@@ -63,7 +63,10 @@ Key variables:
 ## Official builds
 - Official Matchbox workflows now publish the OS artifact first, then build the installer with that exact digest-pinned OS ref baked into `OS_DEFAULT_REF`.
 - Official installers bake `INSTALL_DEFAULTS_REF=''` for deterministic default installs; operators can still override via `/boot/firmware/ourbox-installer.env`.
-- Official nightly builds resolve the latest `sw-ourbox-os` `edge` platform bundle digests at workflow time before building the OS image; release builds continue to consume the pinned refs in `release/official-inputs.env`.
+- Push-to-`main` official candidate builds consume the pinned refs in `release/official-inputs.env` and publish the `beta` lane.
+- Stable builds are a promotion of that already-published candidate digest; they are not rebuilt on release.
+- Scheduled nightly integration builds resolve the latest `sw-ourbox-os` `edge` platform bundle digests at workflow time and publish the `nightly` lane.
+- GitHub prereleases promote the same candidate digest into `exp-labs`.
 
 ## Catalog TSV
 - Tag: `${OS_TARGET}-catalog`

@@ -1,7 +1,7 @@
 # REVALIDATION_TRIGGER
 #
 # Edit this file to force an official publish from a PR that contains no other
-# source changes. Any change to this file triggers official-nightly.yml because
+# source changes. Any change to this file triggers official-candidate.yml because
 # `release/` is NOT in the paths-ignore list.
 #
 # Usage (when you need an official republish after an infra change or after
@@ -10,7 +10,7 @@
 #   1. Create a PR branch
 #   2. Edit this file (e.g., add a line below with the date and reason)
 #   3. Merge the PR to main
-#   4. official-nightly.yml fires with the merge commit as source
+#   4. official-candidate.yml fires with the merge commit as source
 #
 # Do not delete this file — it is the documented official-republish escape hatch.
 # Do not use this as a substitute for real source changes.

@@ -20,30 +20,36 @@ Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
 
 ## Official release channels
 
-| Channel tag | Artifact | Trigger |
+| Channel tag(s) | Artifact | Trigger |
 |---|---|---|
-| `rpi-nightly` | OS image | Push to `main` |
-| `rpi-installer-nightly` | Installer | Push to `main` |
-| `rpi-stable` | OS image | `v*` tag push |
-| `rpi-installer-stable` | Installer | `v*` tag push |
+| `rpi-beta` / `rpi-installer-beta` | OS image / Installer | Push to `main` using pinned `release/official-inputs.env` (heavy build) |
+| `rpi-stable` / `rpi-installer-stable` | OS image / Installer | GitHub Release `published` (promotion only; no rebuild) |
+| `rpi-nightly` / `rpi-installer-nightly` | OS image / Installer | Scheduled integration build using floating upstream `edge` refs (heavy build) |
+| `rpi-exp-labs` / `rpi-installer-exp-labs` | OS image / Installer | GitHub Release `prereleased` (promotion only; no rebuild) |
 
 Registry namespaces (from `release/official-artifacts.env`):
 - OS image: `ghcr.io/techofourown/ourbox-matchbox-os`
 - Installer: `ghcr.io/techofourown/ourbox-matchbox-installer`
 
-Each immutable tag is named after the build basename (e.g., `img-ourbox-matchbox-rpi-YYYYMMDD-HHMMSS`).
-Moving channel tags (`rpi-nightly`, `rpi-stable`) always point to the latest build in that channel.
+Heavy publish lanes create immutable build tags (`main-<sha12>-rpi`, `nightly-<sha12>-rpi`) and
+their installer equivalents. Stable and exp-labs promotions add versioned aliases to an existing
+digest instead of rebuilding it.
+
+Moving channel tags (`rpi-beta`, `rpi-stable`, `rpi-nightly`, `rpi-exp-labs`) always point to the
+latest artifact in that channel.
 A catalog tag (`rpi-catalog`) accumulates one TSV row per published build.
 
 ---
 
 ## Trusted release contexts
 
-- Push to `main` branch (nightly)
-- Signed `v*` tag push (stable release)
+- Push to protected `main` branch (beta candidate build)
+- Scheduled nightly integration publish (floating upstream `edge` inputs)
+- GitHub Release `published` for stable promotion
+- GitHub Release `prereleased` for exp-labs promotion
 
 These are the only authorized triggers for the official publication lane.
-`workflow_dispatch` is intentionally absent from all official publish workflows.
+`workflow_dispatch` is intentionally absent from all official publish/promote workflows.
 
 ---
 
@@ -69,16 +75,20 @@ hidden build logic.
 
 | Workflow | File | Runner | Trigger |
 |---|---|---|---|
-| Official nightly | `.github/workflows/official-nightly.yml` | `[self-hosted, official-heavy, pi-image]` | Push to `main` (source-filtered) |
-| Official release | `.github/workflows/official-release.yml` | `[self-hosted, official-heavy, pi-image]` | `v*` tag push (all changes) |
+| Official candidate | `.github/workflows/official-candidate.yml` | `[self-hosted, official-heavy, pi-image]` | Push to `main` (source-filtered) |
+| Integration nightly | `.github/workflows/integration-nightly.yml` | `[self-hosted, official-heavy, pi-image]` | Daily cron |
+| Official promote stable | `.github/workflows/official-promote-stable.yml` | `ubuntu-latest` | GitHub Release `published` |
+| Official exp-labs promote | `.github/workflows/official-exp-labs.yml` | `ubuntu-latest` | GitHub Release `prereleased` |
 
-Both run on organization-controlled build infrastructure in the `official-heavy-artifacts`
-runner group. Third-party hosted runners are not used for artifact publication.
+The heavy build lanes (`official-candidate.yml`, `integration-nightly.yml`) run on
+organization-controlled build infrastructure in the `official-heavy-artifacts` runner group.
+Promotion workflows run on `ubuntu-latest` because they retag an existing digest rather than
+rebuilding it.
 
 ### Trigger filtering
 
-`official-nightly.yml` uses `paths-ignore` to skip publication for documentation-only changes.
-The following paths do not trigger a nightly build when changed:
+`official-candidate.yml` uses `paths-ignore` to skip publication for documentation-only changes.
+The following paths do not trigger a candidate build when changed:
 
 ```
 docs/**
@@ -86,17 +96,18 @@ README.md
 CLAUDE.md
 ```
 
-All other paths are treated as potentially artifact-affecting and do trigger the nightly build.
+All other paths are treated as potentially artifact-affecting and do trigger the candidate build.
 If a source change lands outside these ignored paths, it will trigger publication even if it
 does not materially affect the built image.
 
-`official-release.yml` is not filtered — it triggers on explicit `v*` tag push, which is
-always an intentional release act.
+`integration-nightly.yml` is schedule-driven and intentionally ignores repo path filters.
+The release-driven promotion workflows are also unfiltered because they do not rebuild: they
+only retag an already-published immutable digest after an explicit GitHub Release act.
 
 ### Forcing an official republish without source changes
 
 Touch `release/REVALIDATION_TRIGGER` in a PR. That file is not in the `paths-ignore` list,
-so merging a change to it will trigger `official-nightly.yml`. Use this when you need an
+so merging a change to it will trigger `official-candidate.yml`. Use this when you need an
 official artifact after infrastructure maintenance or runner migration, without making a
 substantive code change. See `release/REVALIDATION_TRIGGER` for the documented procedure.
 
@@ -117,7 +128,7 @@ Every published artifact carries the following provenance in its OCI annotations
 |---|---|
 | `org.opencontainers.image.source` | `https://github.com/techofourown/img-ourbox-matchbox` |
 | `org.opencontainers.image.revision` | Git commit SHA (short, 12 chars) |
-| `org.opencontainers.image.version` | `OURBOX_VERSION` env (semver or `dev`) |
+| `org.opencontainers.image.version` | `OURBOX_VERSION` env (`main-<sha12>` / `nightly-<sha12>` / local `dev`) |
 | `org.opencontainers.image.created` | Build timestamp (UTC, ISO 8601) |
 | `techofourown.artifact.kind` | `os-image` or `installer-image` |
 | `techofourown.target` | `rpi` |
@@ -136,11 +147,15 @@ Additional metadata is published as artifact files:
 
 Canonical artifact identity for consumption is **by digest** (e.g., `ghcr.io/techofourown/ourbox-matchbox-os@sha256:...`).
 
+Promotion workflows do not rewrite the artifact payload or its embedded metadata. Stable and
+exp-labs semantics live in the promoted tags and catalog rows; the underlying artifact keeps the
+channel-neutral build identity from the heavy publish lane.
+
 ---
 
 ## Upstream input pinning
 
-The official build consumes pinned OCI artifacts from `sw-ourbox-os` (defined in
+The official candidate build consumes pinned OCI artifacts from `sw-ourbox-os` (defined in
 `release/official-inputs.env`):
 
 ```
@@ -149,6 +164,9 @@ AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:<di
 ```
 
 These MUST be digest-pinned refs (never floating tags).
+
+The scheduled nightly integration build intentionally overrides those pins at workflow time by
+resolving the latest upstream `edge` digests before building.
 
 To update when `sw-ourbox-os` ships a new bundle:
 
@@ -160,8 +178,8 @@ oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-arm64
 # Update release/official-inputs.env with new digests, open a PR
 ```
 
-The update must go through a PR so that the pinned refs are reviewed and the nightly build
-picks up the new platform bundle.
+The update must go through a PR so that the pinned refs are reviewed and the next candidate build
+publishes a new promotable beta artifact.
 
 ---
 

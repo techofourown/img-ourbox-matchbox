@@ -72,7 +72,8 @@ Official OS and installer artifacts are produced by organization-controlled buil
 per [ADR-0008](https://github.com/techofourown/org-techofourown/blob/main/docs/decisions/ADR-0008-adopt-organization-controlled-build-infrastructure-for-heavy-artifacts.md)
 and the [Official Artifact Build and Provenance Policy](https://github.com/techofourown/org-techofourown/blob/main/docs/policies/OFFICIAL_ARTIFACT_BUILD_AND_PROVENANCE_POLICY.md).
 
-- Official workflows (`official-nightly.yml`, `official-release.yml`) run on `[self-hosted, official-heavy, pi-image]` runners in the `official-heavy-artifacts` org runner group
+- Heavy official workflows (`official-candidate.yml`, `integration-nightly.yml`) run on `[self-hosted, official-heavy, pi-image]` runners in the `official-heavy-artifacts` org runner group
+- Promotion workflows (`official-promote-stable.yml`, `official-exp-labs.yml`) run on `ubuntu-latest` because they retag an existing digest instead of rebuilding it
 - Official artifacts are digest-addressable OCI artifacts; see `release/official-artifacts.env` for repos and channel tags
 - Upstream platform bundles are digest-pinned in `release/official-inputs.env` — update via PR when `sw-ourbox-os` ships new bundles
 - See `docs/ARTIFACT_PROVENANCE.md` for the required audit record (artifact types, release channels, provenance metadata, signature status)

@@ -1,20 +1,19 @@
-name: Official Release Build & Publish (Matchbox)
+name: Integration Nightly Build & Publish (Matchbox)
 
 on:
-  release:
-    types: [published]
+  schedule:
+    - cron: '35 6 * * *'
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: official-release-matchbox-${{ github.event.release.tag_name || github.run_id }}
+  group: integration-nightly-matchbox
   cancel-in-progress: false
 
 jobs:
   build-publish:
-    if: startsWith(github.event.release.tag_name, 'v') && !github.event.release.draft
     runs-on: [self-hosted, official-heavy, pi-image]
     timeout-minutes: 240
 
@@ -22,24 +21,29 @@ jobs:
       - name: Fix workspace ownership from previous build
         run: sudo chown -R "$(id -u):$(id -g)" "${GITHUB_WORKSPACE}" 2>/dev/null || true
 
-      - name: Checkout release tag
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: refs/tags/${{ github.event.release.tag_name }}
-          fetch-depth: 0
-          fetch-tags: true
+          ref: main
           submodules: recursive
+          fetch-depth: 0
 
-      - name: Set release version
-        run: echo "OURBOX_VERSION=${{ github.event.release.tag_name }}" >> "${GITHUB_ENV}"
-
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Set build identity
+        run: echo "OURBOX_VERSION=nightly-${GITHUB_SHA:0:12}" >> "${GITHUB_ENV}"
 
       - name: Bootstrap host dependencies
         run: sudo ./tools/bootstrap-host.sh
 
-      - name: Fetch pinned upstream inputs
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Resolve latest nightly upstream inputs
+        run: |
+          set -euo pipefail
+          echo "OURBOX_PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge)" >> "${GITHUB_ENV}"
+          echo "OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-arm64)" >> "${GITHUB_ENV}"
+
+      - name: Fetch nightly upstream inputs
         run: ./tools/fetch-airgap-platform.sh
 
       - name: Build OS image
@@ -51,10 +55,8 @@ jobs:
       - name: Reclaim build output ownership
         run: sudo chown -R "$(id -u):$(id -g)" deploy/
 
-      - name: Publish OS artifact (official release)
-        run: ./tools/publish-os-artifact-official.sh release
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+      - name: Publish OS artifact (integration nightly)
+        run: ./tools/publish-os-artifact-official.sh nightly
 
       - name: Resolve installer default OS ref
         run: |
@@ -67,6 +69,7 @@ jobs:
           OURBOX_TARGET: rpi
           OURBOX_VARIANT: prod
           OS_REPO: ghcr.io/techofourown/ourbox-matchbox-os
+          OS_CHANNEL: nightly
           OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
           INSTALL_DEFAULTS_REF: ""
 
@@ -79,16 +82,14 @@ jobs:
           OURBOX_TARGET: rpi
           EXPECTED_OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
 
-      - name: Publish installer artifact (official release)
-        run: ./tools/publish-installer-artifact-official.sh release
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+      - name: Publish installer artifact (integration nightly)
+        run: ./tools/publish-installer-artifact-official.sh nightly
 
       - name: Upload provenance outputs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: provenance-release-${{ github.event.release.tag_name }}
+          name: provenance-nightly-${{ github.sha }}
           path: |
             deploy/os-artifact.ref
             deploy/os-artifact.pinned.ref

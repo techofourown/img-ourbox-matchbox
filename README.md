@@ -72,8 +72,10 @@ See [`docs/OPS.md`](./docs/OPS.md) for full prerequisites and troubleshooting.
 
 Official artifacts are built and published automatically once the self-hosted builder is running:
 
-- Push to `main` → `official-nightly.yml` → nightly OS + installer artifacts on `rpi-nightly` / `rpi-installer-nightly`
-- Push `v*` tag → `official-release.yml` → versioned + stable OS + installer artifacts on `rpi-stable` / `rpi-installer-stable`
+- Push to `main` → `official-candidate.yml` → promotable `beta` OS + installer artifacts on `rpi-beta` / `rpi-installer-beta`
+- Daily cron → `integration-nightly.yml` → integration-preview artifacts on `rpi-nightly` / `rpi-installer-nightly`
+- GitHub Release `published` → `official-promote-stable.yml` → promote the existing candidate digest into `rpi-stable` / `rpi-installer-stable`
+- GitHub Release `prereleased` → `official-exp-labs.yml` → promote the existing candidate digest into `rpi-exp-labs` / `rpi-installer-exp-labs`
 
 Publication targets and upstream input pins are repo-defined in `release/`:
 
@@ -83,6 +85,5 @@ Publication targets and upstream input pins are repo-defined in `release/`:
 Official Matchbox installer builds publish the OS artifact first and then bake that exact pinned
 OS payload ref into the installer defaults, so the published installer and its default install
 target stay on the same lane.
-Official nightly builds also resolve the latest `sw-ourbox-os` `edge` platform bundle digests at
-workflow time before building the OS image; release builds continue to consume the pinned refs in
-`release/official-inputs.env`.
+Candidate builds consume the pinned refs in `release/official-inputs.env`; scheduled nightly
+integration builds resolve the latest `sw-ourbox-os` `edge` digests at workflow time.

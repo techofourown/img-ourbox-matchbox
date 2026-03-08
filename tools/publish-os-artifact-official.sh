@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Official OS artifact publication wrapper.
 # Sources repo-defined release config only — no free-form inputs accepted.
-# Called by the official-nightly and official-release GitHub Actions workflows.
+# Called by the official candidate and integration nightly GitHub Actions workflows.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,23 +10,23 @@ source "${ROOT}/tools/lib.sh"
 # shellcheck disable=SC1091
 source "${ROOT}/release/official-artifacts.env"
 
-RELEASE_CONTEXT="${1:?Usage: publish-os-artifact-official.sh nightly|release}"
+RELEASE_CONTEXT="${1:?Usage: publish-os-artifact-official.sh beta|nightly}"
 
 case "${RELEASE_CONTEXT}" in
+  beta|candidate)
+    [[ -n "${GITHUB_SHA:-}" ]] || die "GITHUB_SHA not set"
+    OURBOX_VERSION="main-${GITHUB_SHA:0:12}"
+    OS_CHANNEL_TAGS="${OFFICIAL_OS_BETA_CHANNELS}"
+    OS_IMMUTABLE_TAG="main-${GITHUB_SHA:0:12}-${OURBOX_TARGET}"
+    ;;
   nightly)
     [[ -n "${GITHUB_SHA:-}" ]] || die "GITHUB_SHA not set"
     OURBOX_VERSION="nightly-${GITHUB_SHA:0:12}"
     OS_CHANNEL_TAGS="${OFFICIAL_OS_NIGHTLY_CHANNELS}"
     OS_IMMUTABLE_TAG="nightly-${GITHUB_SHA:0:12}-${OURBOX_TARGET}"
     ;;
-  release)
-    OURBOX_VERSION="${RELEASE_TAG:-${GITHUB_REF_NAME:-}}"
-    [[ -n "${OURBOX_VERSION}" ]] || die "release tag not set (RELEASE_TAG and GITHUB_REF_NAME are both empty)"
-    OS_CHANNEL_TAGS="${OFFICIAL_OS_RELEASE_CHANNELS}"
-    OS_IMMUTABLE_TAG="${OURBOX_VERSION}-${OURBOX_TARGET}"
-    ;;
   *)
-    die "Unknown release context: ${RELEASE_CONTEXT} (expected: nightly|release)"
+    die "Unknown release context: ${RELEASE_CONTEXT} (expected: beta|nightly)"
     ;;
 esac
 
