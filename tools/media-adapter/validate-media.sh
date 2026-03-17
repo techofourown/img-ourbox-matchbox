@@ -276,12 +276,12 @@ def validate_airgap_bundle(payload_path: pathlib.Path, manifest_path: pathlib.Pa
                     + parse_result.stderr.strip()
                 )
             fields = parse_result.stdout.splitlines()
-            if len(fields) != 11:
+            if len(fields) != 10:
                 raise SystemExit("mission selected_airgap.manifest_relpath parse returned an unexpected field count")
             manifest_contract_digest = fields[4]
             manifest_airgap_arch = fields[5]
-            manifest_images_lock_path = fields[9]
-            manifest_images_lock_sha = fields[10]
+            manifest_images_lock_path = fields[8]
+            manifest_images_lock_sha = fields[9]
 
             if manifest_contract_digest != required_contract:
                 raise SystemExit(
