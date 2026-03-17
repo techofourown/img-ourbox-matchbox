@@ -52,7 +52,10 @@ def main() -> int:
     if not path.is_file():
         die(f"metadata file not found: {path}")
 
-    allowed_keys = set(args.allow) | set(args.require) | set(args.print_keys)
+    # `--print` controls output shape, not which metadata keys are legal.
+    # Callers that need strict key validation must opt into it with `--allow`
+    # and/or `--require`.
+    allowed_keys = set(args.allow) | set(args.require)
     values: dict[str, str] = {}
 
     for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
