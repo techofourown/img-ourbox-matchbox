@@ -99,6 +99,7 @@ if [[ ! -f "${EXTRACTED_DEFAULTS}" ]]; then
   die "failed to extract /opt/ourbox/installer/defaults.env from built installer image"
 fi
 
+# The legacy airgap fallback keys are intentionally gone from official media.
 grep -q '^AIRGAP_PLATFORM_DEFAULT_REF=' "${EXTRACTED_DEFAULTS}" && die \
   "installer defaults must not carry AIRGAP_PLATFORM_DEFAULT_REF anymore"
 grep -q '^AIRGAP_PLATFORM_CHANNEL_STABLE_TAG=' "${EXTRACTED_DEFAULTS}" && die \
