@@ -881,7 +881,7 @@ ourbox_airgap_platform_selection_select_from_catalog_interactive() {
   local created=""
   local version=""
   local _revision=""
-  local arch=""
+  local _arch=""
   local contract=""
   local profile=""
   local _k3s_version=""
@@ -926,7 +926,7 @@ ourbox_airgap_platform_selection_select_from_catalog_interactive() {
   fi
 
   chosen="${entries[$((pick - 1))]}"
-  IFS=$'\t' read -r channel tag created version _revision arch contract profile _k3s_version _lock_sha _artifact_digest pinned_ref <<<"${chosen}"
+  IFS=$'\t' read -r channel tag created version _revision _arch contract profile _k3s_version _lock_sha _artifact_digest pinned_ref <<<"${chosen}"
   OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${pinned_ref}"
   OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="catalog"
   OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${channel}"
