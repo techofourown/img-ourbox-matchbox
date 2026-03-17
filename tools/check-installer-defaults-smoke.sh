@@ -29,14 +29,6 @@ if [[ -z "${EXPECTED_OS_DEFAULT_REF}" && -f "${DEPLOY_DIR}/os-artifact.pinned.re
 fi
 [[ -n "${EXPECTED_OS_DEFAULT_REF}" ]] || die "EXPECTED_OS_DEFAULT_REF not set and ${DEPLOY_DIR}/os-artifact.pinned.ref missing"
 
-EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF="${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF:-}"
-if [[ -z "${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}" && -f "${ROOT}/release/official-inputs.env" ]]; then
-  # shellcheck disable=SC1091
-  source "${ROOT}/release/official-inputs.env"
-  EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF="${AIRGAP_PLATFORM_REF:-}"
-fi
-[[ -n "${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}" ]] || die "EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF not set and release/official-inputs.env did not provide AIRGAP_PLATFORM_REF"
-
 SUDO=""
 if [[ ${EUID} -ne 0 ]]; then
   command -v sudo >/dev/null 2>&1 || die "sudo required to inspect installer image partitions"
@@ -107,6 +99,17 @@ if [[ ! -f "${EXTRACTED_DEFAULTS}" ]]; then
   die "failed to extract /opt/ourbox/installer/defaults.env from built installer image"
 fi
 
+grep -q '^AIRGAP_PLATFORM_DEFAULT_REF=' "${EXTRACTED_DEFAULTS}" && die \
+  "installer defaults must not carry AIRGAP_PLATFORM_DEFAULT_REF anymore"
+grep -q '^AIRGAP_PLATFORM_CHANNEL_STABLE_TAG=' "${EXTRACTED_DEFAULTS}" && die \
+  "installer defaults must not carry AIRGAP_PLATFORM_CHANNEL_STABLE_TAG anymore"
+grep -q '^AIRGAP_PLATFORM_CHANNEL_BETA_TAG=' "${EXTRACTED_DEFAULTS}" && die \
+  "installer defaults must not carry AIRGAP_PLATFORM_CHANNEL_BETA_TAG anymore"
+grep -q '^AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG=' "${EXTRACTED_DEFAULTS}" && die \
+  "installer defaults must not carry AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG anymore"
+grep -q '^AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG=' "${EXTRACTED_DEFAULTS}" && die \
+  "installer defaults must not carry AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG anymore"
+
 # shellcheck disable=SC1090
 source "${EXTRACTED_DEFAULTS}"
 
@@ -114,8 +117,6 @@ source "${EXTRACTED_DEFAULTS}"
   "installer defaults OS_DEFAULT_REF mismatch: expected '${EXPECTED_OS_DEFAULT_REF}', found '${OS_DEFAULT_REF:-}'"
 [[ -z "${AIRGAP_PLATFORM_REF:-}" ]] || die \
   "installer defaults AIRGAP_PLATFORM_REF must be empty on official media, found '${AIRGAP_PLATFORM_REF:-}'"
-[[ "${AIRGAP_PLATFORM_DEFAULT_REF:-}" == "${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}" ]] || die \
-  "installer defaults AIRGAP_PLATFORM_DEFAULT_REF mismatch: expected '${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}', found '${AIRGAP_PLATFORM_DEFAULT_REF:-}'"
 [[ "${AIRGAP_PLATFORM_ARCH:-}" == "arm64" ]] || die \
   "installer defaults AIRGAP_PLATFORM_ARCH mismatch: expected 'arm64', found '${AIRGAP_PLATFORM_ARCH:-}'"
 [[ "${AIRGAP_PLATFORM_CATALOG_TAG:-}" == "catalog-arm64" ]] || die \
@@ -129,7 +130,6 @@ ARTIFACT=$(basename "${IMG_XZ}")
 EXTRACTED_DEFAULTS=${DEPLOY_DIR}/installer-defaults.extracted.env
 OS_DEFAULT_REF=${OS_DEFAULT_REF}
 AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF-}
-AIRGAP_PLATFORM_DEFAULT_REF=${AIRGAP_PLATFORM_DEFAULT_REF}
 AIRGAP_PLATFORM_ARCH=${AIRGAP_PLATFORM_ARCH}
 AIRGAP_PLATFORM_CATALOG_TAG=${AIRGAP_PLATFORM_CATALOG_TAG}
 INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF-}

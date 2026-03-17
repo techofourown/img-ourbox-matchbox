@@ -130,7 +130,6 @@ ourbox_selection_load_remote_install_defaults() {
   local extract_dir="$2"
   local override_env="${3:-}"
   local baked_os_default_ref="${OS_DEFAULT_REF:-}"
-  local baked_airgap_default_ref="${AIRGAP_PLATFORM_DEFAULT_REF:-}"
   local expected_installer_id="${INSTALLER_ID:-}"
 
   OURBOX_INSTALL_DEFAULTS_SOURCE="baked"
@@ -195,9 +194,6 @@ ourbox_selection_load_remote_install_defaults() {
   # explicitly replaces it with another non-empty ref.
   if [[ -n "${baked_os_default_ref}" && -z "${OS_DEFAULT_REF:-}" ]]; then
     OS_DEFAULT_REF="${baked_os_default_ref}"
-  fi
-  if [[ -n "${baked_airgap_default_ref}" && -z "${AIRGAP_PLATFORM_DEFAULT_REF:-}" ]]; then
-    AIRGAP_PLATFORM_DEFAULT_REF="${baked_airgap_default_ref}"
   fi
 
   # shellcheck disable=SC2034  # output state consumed by the sourcing installer
@@ -636,22 +632,6 @@ ourbox_selection_finalize_registry_ref() {
     "OS artifact"
 }
 
-ourbox_airgap_platform_selection_channel_tag() {
-  local channel="${1:-}"
-  local arch="${AIRGAP_PLATFORM_ARCH:-}"
-  local tag=""
-
-  case "${channel}" in
-    stable) tag="${AIRGAP_PLATFORM_CHANNEL_STABLE_TAG:-}"; [[ -n "${tag}" ]] || tag="stable-${arch}" ;;
-    beta) tag="${AIRGAP_PLATFORM_CHANNEL_BETA_TAG:-}"; [[ -n "${tag}" ]] || tag="beta-${arch}" ;;
-    nightly) tag="${AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG:-}"; [[ -n "${tag}" ]] || tag="nightly-${arch}" ;;
-    exp-labs) tag="${AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG:-}"; [[ -n "${tag}" ]] || tag="exp-labs-${arch}" ;;
-    *) tag="${channel}-${arch}" ;;
-  esac
-  [[ -n "${tag}" ]] || ourbox_selection_die "unable to resolve airgap-platform channel tag for '${channel}'"
-  printf '%s\n' "${tag}"
-}
-
 ourbox_airgap_platform_selection_require_context() {
   local required_contract_digest="${1:-}"
 
@@ -745,7 +725,6 @@ ourbox_airgap_platform_determine_channel_ref() {
   local catalog_dir="$1"
   local required_contract_digest="$2"
   local channel="${3:-${AIRGAP_PLATFORM_CHANNEL}}"
-  local channel_tag_ref=""
   local catalog_tsv=""
   local catalog_ref=""
 
@@ -756,27 +735,27 @@ ourbox_airgap_platform_determine_channel_ref() {
   OURBOX_AIRGAP_PLATFORM_SELECTED_REF=""
   OURBOX_AIRGAP_PLATFORM_CATALOG_REF=""
 
-  channel_tag_ref="${AIRGAP_PLATFORM_REPO}:$(ourbox_airgap_platform_selection_channel_tag "${channel}")"
-
-  if [[ "${AIRGAP_PLATFORM_CATALOG_ENABLED:-1}" == "1" ]]; then
-    if ourbox_airgap_platform_selection_pull_catalog "${catalog_dir}"; then
-      catalog_tsv="${catalog_dir}/catalog.tsv"
-      catalog_ref="$(ourbox_airgap_platform_catalog_newest_ref "${catalog_tsv}" "${channel}" "${required_contract_digest}" "${AIRGAP_PLATFORM_ARCH:-}" || true)"
-      if ourbox_selection_is_digest_pinned_ref "${catalog_ref}"; then
-        OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="catalog"
-        OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${channel}"
-        OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${catalog_ref}"
-        return 0
-      fi
-      ourbox_selection_log "Airgap catalog has no valid digest-pinned entry for channel '${channel}' and contract '${required_contract_digest}'; falling back to channel tag."
-    else
-      ourbox_selection_log "Airgap catalog unavailable; falling back to channel tag."
-    fi
+  if [[ "${AIRGAP_PLATFORM_CATALOG_ENABLED:-1}" != "1" ]]; then
+    ourbox_selection_log "Airgap catalog browsing is disabled; no catalog-backed airgap default is available."
+    return 1
   fi
 
-  OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="channel-tag"
+  if ! ourbox_airgap_platform_selection_pull_catalog "${catalog_dir}"; then
+    ourbox_selection_log "Airgap catalog unavailable for ${AIRGAP_PLATFORM_REPO}:${AIRGAP_PLATFORM_CATALOG_TAG}."
+    return 1
+  fi
+
+  catalog_tsv="${catalog_dir}/catalog.tsv"
+  catalog_ref="$(ourbox_airgap_platform_catalog_newest_ref "${catalog_tsv}" "${channel}" "${required_contract_digest}" "${AIRGAP_PLATFORM_ARCH:-}" || true)"
+  if ! ourbox_selection_is_digest_pinned_ref "${catalog_ref}"; then
+    ourbox_selection_log "Airgap catalog has no valid digest-pinned entry for channel '${channel}' and contract '${required_contract_digest}'."
+    return 1
+  fi
+
+  OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="catalog"
   OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${channel}"
-  OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${channel_tag_ref}"
+  OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${catalog_ref}"
+  return 0
 }
 
 ourbox_airgap_platform_determine_default_ref() {
@@ -796,17 +775,12 @@ ourbox_airgap_platform_determine_default_ref() {
     return 0
   fi
 
-  if [[ -n "${AIRGAP_PLATFORM_DEFAULT_REF:-}" ]]; then
-    OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="airgap-platform-default-ref"
-    OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${AIRGAP_PLATFORM_DEFAULT_REF}"
-    return 0
-  fi
-
   ourbox_airgap_platform_determine_channel_ref "${catalog_dir}" "${required_contract_digest}" "${AIRGAP_PLATFORM_CHANNEL}"
 }
 
 ourbox_airgap_platform_selection_show_default_choice() {
   local ref="$1"
+  local default_available="${2:-1}"
 
   echo
   if [[ "${OURBOX_INSTALL_DEFAULTS_SOURCE:-baked}" == "remote" ]]; then
@@ -815,10 +789,16 @@ ourbox_airgap_platform_selection_show_default_choice() {
   else
     echo "Install defaults: baked defaults"
   fi
-  echo "Default source : ${OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE:-pending}"
-  echo "Default: use airgap bundle '${ref}'"
+  echo "Default source : ${OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE:-unavailable}"
+  if [[ "${default_available}" == "1" ]]; then
+    echo "Default: use airgap bundle '${ref}'"
+  else
+    echo "Default: unavailable without a matching catalog row or explicit ref"
+  fi
   echo "Options:"
-  echo "  [ENTER] Use default"
+  if [[ "${default_available}" == "1" ]]; then
+    echo "  [ENTER] Use default"
+  fi
   echo "  c       Choose channel (prefers newest contract-matching catalog row for that lane)"
   echo "  l       List from catalog (if available)"
   echo "  r       Enter custom OCI ref (tag or digest)"
@@ -840,7 +820,6 @@ ourbox_airgap_platform_selection_override_repo_interactive() {
 
   AIRGAP_PLATFORM_REPO="${next_repo}"
   AIRGAP_PLATFORM_REF=""
-  AIRGAP_PLATFORM_DEFAULT_REF=""
 
   read -r -p "Catalog tag [${next_catalog}]: " user_catalog
   if [[ -n "${user_catalog}" ]]; then
@@ -859,10 +838,10 @@ ourbox_airgap_platform_selection_choose_channel_interactive() {
   local custom_tag=""
 
   echo "Channels:"
-  echo "  1) stable (${AIRGAP_PLATFORM_CHANNEL_STABLE_TAG:-$(ourbox_airgap_platform_selection_channel_tag stable)}) (recommended)"
-  echo "  2) beta (${AIRGAP_PLATFORM_CHANNEL_BETA_TAG:-$(ourbox_airgap_platform_selection_channel_tag beta)})"
-  echo "  3) nightly (${AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG:-$(ourbox_airgap_platform_selection_channel_tag nightly)})"
-  echo "  4) exp-labs (${AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG:-$(ourbox_airgap_platform_selection_channel_tag exp-labs)})"
+  echo "  1) stable (recommended)"
+  echo "  2) beta"
+  echo "  3) nightly"
+  echo "  4) exp-labs"
   echo "  5) custom tag name"
 
   read -r -p "Select channel [1-5]: " pick
@@ -878,7 +857,7 @@ ourbox_airgap_platform_selection_choose_channel_interactive() {
         return 1
       }
       OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${AIRGAP_PLATFORM_REPO}:${custom_tag}"
-      OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="channel-tag"
+      OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="operator-override"
       OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=""
       return 0
       ;;
@@ -978,26 +957,38 @@ ourbox_airgap_platform_selection_interactive_select_ref() {
   local default_ref=""
   local default_source=""
   local default_channel=""
+  local default_available="0"
 
   OURBOX_AIRGAP_PLATFORM_SELECTED_REF=""
   OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE=""
   OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=""
 
   while [[ -z "${OURBOX_AIRGAP_PLATFORM_SELECTED_REF}" ]]; do
-    ourbox_airgap_platform_determine_default_ref "${default_catalog_dir}" "${required_contract_digest}"
-    default_ref="${OURBOX_AIRGAP_PLATFORM_SELECTED_REF}"
-    default_source="${OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE}"
-    default_channel="${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+    if ourbox_airgap_platform_determine_default_ref "${default_catalog_dir}" "${required_contract_digest}"; then
+      default_ref="${OURBOX_AIRGAP_PLATFORM_SELECTED_REF}"
+      default_source="${OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE}"
+      default_channel="${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+      default_available="1"
+    else
+      default_ref=""
+      default_source=""
+      default_channel=""
+      default_available="0"
+    fi
     OURBOX_AIRGAP_PLATFORM_SELECTED_REF=""
 
-    ourbox_airgap_platform_selection_show_default_choice "${default_ref}"
+    ourbox_airgap_platform_selection_show_default_choice "${default_ref}" "${default_available}"
     read -r -p "Choice: " choice
 
     case "${choice}" in
       "")
-        OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${default_ref}"
-        OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="${default_source}"
-        OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${default_channel}"
+        if [[ "${default_available}" == "1" ]]; then
+          OURBOX_AIRGAP_PLATFORM_SELECTED_REF="${default_ref}"
+          OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE="${default_source}"
+          OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${default_channel}"
+        else
+          ourbox_selection_log "No catalog-backed default is available. Choose c, l, r, o, or q."
+        fi
         ;;
       c)
         ourbox_airgap_platform_selection_choose_channel_interactive "${channel_catalog_dir}" "${required_contract_digest}" || true
