@@ -56,13 +56,24 @@ xz -dc "${IMG_XZ}" > "${RAW_IMG}"
 
 log "Attaching loop device"
 LOOPDEV="$(${SUDO} losetup --find --show -Pf "${RAW_IMG}")"
+if command -v udevadm >/dev/null 2>&1; then
+  ${SUDO} udevadm settle >/dev/null 2>&1 || true
+fi
 
 wait_for_loop_parts() {
-  local deadline=$((SECONDS + 10))
+  local deadline=$((SECONDS + 30))
+  local lsblk_output=""
   local parts=()
 
   while (( SECONDS < deadline )); do
-    mapfile -t parts < <(${SUDO} lsblk -rno PATH,TYPE "${LOOPDEV}" | awk '$2=="part" {print $1}')
+    # Loop devices on the official runner can take a moment to show up in lsblk
+    # even after losetup returns, so treat an empty/failed probe as retryable.
+    lsblk_output="$(${SUDO} lsblk -rno PATH,TYPE "${LOOPDEV}" 2>/dev/null || true)"
+    if [[ -z "${lsblk_output}" ]]; then
+      sleep 1
+      continue
+    fi
+    mapfile -t parts < <(awk '$2=="part" {print $1}' <<<"${lsblk_output}")
     if (( ${#parts[@]} > 0 )); then
       printf '%s\n' "${parts[@]}"
       return 0
@@ -73,8 +84,13 @@ wait_for_loop_parts() {
   return 1
 }
 
-mapfile -t loop_parts < <(wait_for_loop_parts)
+loop_parts_output="$(wait_for_loop_parts || true)"
+loop_parts=()
+if [[ -n "${loop_parts_output}" ]]; then
+  mapfile -t loop_parts <<<"${loop_parts_output}"
+fi
 if (( ${#loop_parts[@]} == 0 )); then
+  ${SUDO} losetup -l "${LOOPDEV}" >&2 || true
   ${SUDO} lsblk -rno PATH,TYPE,FSTYPE "${LOOPDEV}" >&2 || true
   die "no loop partitions found in installer image ${IMG_XZ}"
 fi
