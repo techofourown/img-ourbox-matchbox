@@ -909,7 +909,7 @@ ourbox_airgap_platform_selection_select_from_catalog_interactive() {
   echo
   echo "Airgap catalog entries (${OURBOX_AIRGAP_PLATFORM_CATALOG_REF}):"
   for chosen in "${entries[@]}"; do
-    IFS=$'\t' read -r channel tag created version _revision arch contract profile _k3s_version _lock_sha _artifact_digest pinned_ref <<<"${chosen}"
+    IFS=$'\t' read -r channel tag created version _revision _arch contract profile _k3s_version _lock_sha _artifact_digest pinned_ref <<<"${chosen}"
     printf "  %d) %-10s %-24s %s %s %s\n" "${i}" "${channel}" "${tag}" "${version}" "${created}" "${contract}"
     i=$((i + 1))
   done

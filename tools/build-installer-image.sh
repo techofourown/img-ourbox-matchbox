@@ -8,9 +8,6 @@ source "${ROOT}/tools/lib.sh"
 # shellcheck disable=SC1091
 source "${ROOT}/tools/registry.sh"
 
-CALLER_AIRGAP_PLATFORM_REF_SET="${AIRGAP_PLATFORM_REF+x}"
-CALLER_AIRGAP_PLATFORM_REF_VALUE="${AIRGAP_PLATFORM_REF-}"
-
 cleanup_loopdevs_on_exit() {
   local rc=$?
   trap - EXIT
