@@ -88,7 +88,9 @@ for part in "${loop_parts[@]}"; do
     ${SUDO} test -f "${MOUNT_DIR}/opt/ourbox/tools/ourbox-install" && HAS_INSTALLER=1
     ${SUDO} test -f "${MOUNT_DIR}/opt/ourbox/tools/installer-ssh-helper.sh" && HAS_SSH_HELPER=1
     ${SUDO} test -d "${MOUNT_DIR}/opt/ourbox/mission" && HAS_MISSION_DIR=1
-    ${SUDO} test -f "${MOUNT_DIR}/opt/ourbox/tools/installer-selection-resolver.sh" && HAS_SELECTION_RESOLVER=1 || true
+    if ${SUDO} test -f "${MOUNT_DIR}/opt/ourbox/tools/installer-selection-resolver.sh"; then
+      HAS_SELECTION_RESOLVER=1
+    fi
     ${SUDO} cat "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" > "${EXTRACTED_DEFAULTS}"
     ${SUDO} umount "${MOUNT_DIR}"
     break
