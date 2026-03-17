@@ -58,19 +58,11 @@ jobs:
       - name: Publish OS artifact (official beta)
         run: ./tools/publish-os-artifact-official.sh beta
 
-      - name: Resolve installer default OS ref
-        run: |
-          set -euo pipefail
-          echo "OS_DEFAULT_REF=$(cat deploy/os-artifact.pinned.ref)" >> "${GITHUB_ENV}"
-
       - name: Build installer image
         run: sudo -E ./tools/build-installer-image.sh
         env:
           OURBOX_TARGET: rpi
           OURBOX_VARIANT: prod
-          OS_REPO: ghcr.io/techofourown/ourbox-matchbox-os
-          OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
-          INSTALL_DEFAULTS_REF: ""
           OURBOX_INSTALLER_SSH_MODE: off
           OURBOX_INSTALLER_SSH_USER: ourbox-installer
           OURBOX_INSTALLER_SSH_PASSWORD_HASH: ""
@@ -78,16 +70,14 @@ jobs:
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
           OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY: "0"
           OURBOX_REQUIRE_EXPLICIT_VERSION: "1"
-          OURBOX_REQUIRE_OS_DEFAULT_REF: "1"
 
       - name: Reclaim installer output ownership
         run: sudo chown -R "$(id -u):$(id -g)" deploy/
 
-      - name: Smoke check baked installer defaults
-        run: ./tools/check-installer-defaults-smoke.sh
+      - name: Smoke check local-mission installer substrate
+        run: bash ./tools/check-installer-substrate-smoke.sh
         env:
           OURBOX_TARGET: rpi
-          EXPECTED_OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
 
       - name: Publish installer artifact (official beta)
         run: ./tools/publish-installer-artifact-official.sh beta
@@ -129,6 +119,6 @@ jobs:
             deploy/installer-artifact.meta.json
             deploy/installer-artifact.publish.json
             deploy/candidate-provenance.json
-            deploy/installer-defaults.extracted.env
-            deploy/installer-defaults-smoke.txt
+            deploy/installer-runtime.extracted.env
+            deploy/installer-substrate-smoke.txt
           if-no-files-found: error

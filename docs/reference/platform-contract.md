@@ -13,15 +13,13 @@ this repo.
 - Approved upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`
 - Generated lockfile in this repo:
   - `release/official-inputs.env` (official candidate builds)
-- Legacy fallback refs for local/dev use:
-  - `contracts/platform-contract.ref`
-  - `contracts/airgap-platform.ref`
 
 ---
 
 ## Current state (OCI by digest)
 
-Matchbox pulls two GHCR artifacts published by `sw-ourbox-os`:
+Repo-local Matchbox OS and installer-substrate builds pull two GHCR artifacts
+published by `sw-ourbox-os`:
 
 1) **platform-contract** (arch-agnostic)
    - Contents: manifests, landing, todo-bloom assets, contract metadata
@@ -60,6 +58,15 @@ During build, `ourbox-release` generation records platform contract provenance i
 2. Let the upstream sync workflow open the Matchbox lockfile PR updating `release/official-inputs.env`.
 3. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `pigen/`.
 4. Rebuild images; update release notes/changelog with the new digests.
+
+Host-composed installer media is separate:
+
+- `sw-ourbox-installer` chooses the Matchbox OS payload and the Matchbox
+  application bundle on the host
+- that host tool stages a mission directory and embeds it into the published
+  Matchbox installer substrate
+- the Matchbox target installer then consumes only those embedded local mission
+  bytes
 
 ---
 

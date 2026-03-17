@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck disable=SC1091
-source "${ROOT}/tools/lib.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_SH="${SCRIPT_DIR}/lib.sh"
+if [[ ! -f "${LIB_SH}" ]]; then
+  LIB_SH="$(cd "${SCRIPT_DIR}/.." && pwd)/tools/lib.sh"
+fi
+# shellcheck disable=SC1090,SC1091
+source "${LIB_SH}"
+
+if [[ "${OURBOX_FLASH_HELPER_SELFTEST:-0}" == "1" ]]; then
+  log "flash helper self-test passed"
+  exit 0
+fi
 
 if [[ ${EUID} -ne 0 ]]; then
   log "Re-executing with sudo..."

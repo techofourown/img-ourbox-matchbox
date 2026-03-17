@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "kind": "ourbox-media-adapter",
+  "target_id": "matchbox",
+  "phase": "phase-2",
+  "description": "Host-side adapter for composing Matchbox mission media from a selected OS payload and selected arm64 application bundle.",
+  "supported_media_kinds": [
+    "installer-usb"
+  ],
+  "output_kind": "file",
+  "minimum_media_size_bytes": 32000000000,
+  "compose_entrypoint": "tools/media-adapter/compose-media.sh",
+  "validate_entrypoint": "tools/media-adapter/validate-media.sh",
+  "expected_os_artifact_type": "application/vnd.techofourown.ourbox.matchbox.os-image.v1",
+  "expected_airgap_arch": "arm64",
+  "airgap_selection_model": "published-airgap-bundle",
+  "installer_substrate_payload_filename": "installer.img.xz",
+  "official": {
+    "os_repo": "ghcr.io/techofourown/ourbox-matchbox-os",
+    "os_catalog_tag": "rpi-catalog",
+    "os_channel_tags": {
+      "stable": "rpi-stable",
+      "beta": "rpi-beta",
+      "nightly": "rpi-nightly",
+      "exp-labs": "rpi-exp-labs"
+    },
+    "airgap_bundle_repo": "ghcr.io/techofourown/sw-ourbox-os/airgap-platform",
+    "airgap_bundle_catalog_tag": "catalog-arm64",
+    "airgap_bundle_channel_tags": {
+      "stable": "stable-arm64",
+      "beta": "beta-arm64",
+      "nightly": "nightly-arm64",
+      "exp-labs": "exp-labs-arm64"
+    },
+    "installer_repo": "ghcr.io/techofourown/ourbox-matchbox-installer",
+    "installer_channel_tags": {
+      "stable": "rpi-installer-stable",
+      "beta": "rpi-installer-beta",
+      "nightly": "rpi-installer-nightly",
+      "exp-labs": "rpi-installer-exp-labs"
+    }
+  },
+  "runtime_prompts_kept": [
+    "os-disk-selection",
+    "data-disk-selection",
+    "data-disk-format-confirmation",
+    "identity",
+    "install-confirmation"
+  ],
+  "host_prerequisites": [
+    "bash",
+    "python3",
+    "xz",
+    "sha256sum",
+    "losetup",
+    "lsblk",
+    "mount",
+    "umount",
+    "rsync",
+    "findmnt"
+  ],
+  "notes": [
+    "Matchbox mission media is now host-composed from a published installer substrate plus selected local mission artifacts.",
+    "The target installer consumes only the embedded local mission directory and never performs runtime catalog browsing, install-defaults fetches, registry logins, or oras pulls.",
+    "Phase-two Matchbox compose stages the selected OS payload plus a selected arm64 airgap-platform bundle from upstream catalogs."
+  ]
+}

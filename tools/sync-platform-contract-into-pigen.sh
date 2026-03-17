@@ -2,16 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REF_FILE="${ROOT}/contracts/platform-contract.ref"
-[[ -f "${REF_FILE}" ]] || { echo "Missing ${REF_FILE}" >&2; exit 1; }
-
-REF="$(cat "${REF_FILE}")"
 CONTRACT_DIGEST_FILE="${ROOT}/artifacts/platform-contract/extracted/platform-contract/contract.digest"
-if [[ -f "${CONTRACT_DIGEST_FILE}" ]]; then
-  DIGEST="$(cat "${CONTRACT_DIGEST_FILE}")"
-else
-  DIGEST="${REF#*@}"
-fi
+[[ -f "${CONTRACT_DIGEST_FILE}" ]] || {
+  echo "Missing platform contract digest file: ${CONTRACT_DIGEST_FILE}" >&2
+  echo "Run: ./tools/fetch-platform-contract.sh" >&2
+  exit 1
+}
+DIGEST="$(cat "${CONTRACT_DIGEST_FILE}")"
 
 SRC="${ROOT}/artifacts/platform-contract/extracted/platform-contract"
 [[ -d "${SRC}" ]] || {

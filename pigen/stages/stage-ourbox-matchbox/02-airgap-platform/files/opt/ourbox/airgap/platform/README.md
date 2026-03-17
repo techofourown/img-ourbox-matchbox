@@ -3,7 +3,7 @@
 This directory is populated at build time from the pinned platform contract OCI artifact.
 
 Source of truth:
-- contracts/platform-contract.ref (pinned digest)
+- release/official-inputs.env (pinned platform-contract digest)
 - techofourown/sw-ourbox-os (platform-contract publisher)
 
 This synced tree now includes:
