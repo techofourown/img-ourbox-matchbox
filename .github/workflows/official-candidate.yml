@@ -75,7 +75,7 @@ jobs:
         run: sudo chown -R "$(id -u):$(id -g)" deploy/
 
       - name: Smoke check local-mission installer substrate
-        run: ./tools/check-installer-substrate-smoke.sh
+        run: bash ./tools/check-installer-substrate-smoke.sh
         env:
           OURBOX_TARGET: rpi
 

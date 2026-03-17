@@ -18,6 +18,7 @@ OS_META_ENV=""
 SUBSTRATE_ARTIFACT=""
 OUTPUT_DIR=""
 FLASH_DEVICE=""
+ORIGINAL_ARGS=("$@")
 
 usage() {
   cat <<EOF
@@ -83,7 +84,7 @@ done
 
 if [[ ${EUID} -ne 0 ]]; then
   log "Re-executing Matchbox media compose with sudo..."
-  exec sudo -E -- "$0" "$@"
+  exec sudo -E -- "$0" "${ORIGINAL_ARGS[@]}"
 fi
 
 need_cmd xz
@@ -118,10 +119,6 @@ fi
 
 payload_meta_dump="$(
   python3 "${STRICT_METADATA_PARSER}" "${OS_META_ENV}" \
-    --allow OURBOX_TARGET \
-    --allow OURBOX_SKU \
-    --allow OURBOX_VARIANT \
-    --allow OURBOX_VERSION \
     --print OURBOX_TARGET \
     --print OURBOX_SKU \
     --print OURBOX_VARIANT \
