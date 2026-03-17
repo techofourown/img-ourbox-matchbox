@@ -32,26 +32,33 @@ jobs:
       - name: Run shellcheck on build/publish scripts
         run: |
           shellcheck tools/*.sh
+          shellcheck tools/media-adapter/*.sh
           shellcheck tools/release-control/*.sh
+
+      - name: Validate media adapter metadata
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          adapter = json.loads(Path("tools/media-adapter/adapter.json").read_text(encoding="utf-8"))
+          if adapter.get("target_id") != "matchbox":
+              raise SystemExit("tools/media-adapter/adapter.json must declare target_id=matchbox")
+          if adapter.get("airgap_selection_model") != "published-airgap-bundle":
+              raise SystemExit("tools/media-adapter/adapter.json must declare airgap_selection_model=published-airgap-bundle")
+          PY
 
       - name: Check shell syntax (bash -n)
         run: |
           for f in tools/*.sh; do
             bash -n "${f}" && echo "OK: ${f}"
           done
+          for f in tools/media-adapter/*.sh; do
+            bash -n "${f}" && echo "OK: ${f}"
+          done
           for f in tools/release-control/*.sh; do
             bash -n "${f}" && echo "OK: ${f}"
           done
-
-  resolver-sync:
-    name: Vendored resolver sync
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify vendored installer-selection resolver
-        run: bash tools/check-vendored-installer-selection-resolver.sh
 
   installer-ssh-vendoring:
     name: Vendored installer SSH helper sync

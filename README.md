@@ -1,6 +1,7 @@
 # img-ourbox-matchbox
 
-Build repository for **OurBox Matchbox** OS images targeting **Raspberry Pi hardware** (Pi 5 + dual NVMe, Matchbox-class hardware).
+Build repository for **OurBox Matchbox** OS images and installer substrate targeting
+**Raspberry Pi hardware** (Pi 5 + dual NVMe, Matchbox-class hardware).
 
 This repo produces an NVMe-bootable OS that mounts `/var/lib/ourbox` and boots into an airgapped
 single-node k3s runtime via `ourbox-bootstrap`.
@@ -52,21 +53,37 @@ cd img-ourbox-matchbox
 ```
 
 `prepare-installer-media.sh` defaults to pulling the published `rpi-installer-stable` artifact
-from GHCR, verifying its checksum, and flashing your selected removable/USB media.
+from GHCR, but that published artifact is now only the Matchbox installer substrate.
+The wrapper delegates to `sw-ourbox-installer`, which:
 
-### Local source build (maintainer / offline path)
+- selects the Matchbox target
+- resolves the chosen OS payload on the host
+- resolves the chosen arm64 application bundle on the host
+- stages a local mission directory
+- embeds that mission into the published Matchbox installer substrate
+- flashes the composed mission media to your selected removable/USB device
 
-Requires: Linux desktop, sudo, Podman, ~30 min build time.
+The Matchbox target installer itself consumes only the embedded local mission bytes.
+It does not perform target-time catalog browsing, install-defaults fetches,
+registry logins, or ORAS pulls.
+
+### Repo-local maintainer build path
+
+This repo still owns the Matchbox target substrate:
 
 ```bash
 git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox.git
 cd img-ourbox-matchbox
-./tools/prepare-installer-media.sh --build-local
-# move media to Pi, boot, follow prompts, device powers off, remove media, boot NVMe
+./tools/fetch-airgap-platform.sh
+sudo -E ./tools/build-image.sh
+sudo -E ./tools/build-installer-image.sh
 ```
 
-This fetches the pinned upstream airgap bundle, runs pi-gen, and flashes the result.
-See [`docs/OPS.md`](./docs/OPS.md) for full prerequisites and troubleshooting.
+Those commands rebuild the Matchbox OS payload and the published Matchbox installer
+substrate locally. Host-side mission composition and flashing still belong to
+`sw-ourbox-installer`.
+
+See [`docs/OPS.md`](./docs/OPS.md) for prerequisites and troubleshooting.
 
 ## Release pipeline
 
@@ -82,8 +99,8 @@ Publication targets and upstream input pins are repo-defined in `release/`:
 - `release/official-artifacts.env` — official GHCR repos and channel names
 - `release/official-inputs.env` — digest-pinned upstream refs (update via PR when `sw-ourbox-os` ships new bundles)
 
-Official Matchbox installer builds publish the OS artifact first and then bake that exact pinned
-OS payload ref into the installer defaults, so the published installer and its default install
-target stay on the same lane.
-Candidate builds consume the pinned refs in `release/official-inputs.env`; scheduled nightly
-integration builds resolve the latest `sw-ourbox-os` `edge` digests at workflow time.
+Official Matchbox installer builds publish only the Matchbox installer substrate.
+They do not bake OS-selection defaults or target-time application-bundle defaults into
+the image. Candidate builds consume the pinned refs in `release/official-inputs.env`;
+scheduled nightly integration builds resolve the latest `sw-ourbox-os` `edge` digests
+at workflow time for the Matchbox OS image build only.

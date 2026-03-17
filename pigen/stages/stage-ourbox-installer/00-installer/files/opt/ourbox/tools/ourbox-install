@@ -28,84 +28,34 @@ need_cmd mountpoint
 need_cmd find
 need_cmd openssl
 need_cmd sync
-need_cmd curl
 need_cmd tar
 need_cmd ip
 need_cmd sort
 need_cmd udevadm
+need_cmd python3
 
 DATA_CHECK_MP="/run/ourbox-installer/data-check"
 SYS_BOOT_MP="/run/ourbox-installer/sys-boot"
 SYS_ROOT_MP="/run/ourbox-installer/sys-root"
-PAYLOAD_DIR="/opt/ourbox/installer/cache/payload"
-CATALOG_DIR="/opt/ourbox/installer/cache/catalog"
-AIRGAP_CATALOG_DIR="/opt/ourbox/installer/cache/airgap-catalog"
-AIRGAP_PULL_DIR="/opt/ourbox/installer/cache/airgap-platform-pull"
-AIRGAP_OVERRIDE_DIR="/opt/ourbox/installer/cache/airgap-platform-override"
-INSTALL_DEFAULTS_DIR="/opt/ourbox/installer/cache/install-defaults"
-INSTALL_DEFAULTS_EXTRACT_DIR="/opt/ourbox/installer/cache/install-defaults-extracted"
+MISSION_ROOT="/opt/ourbox/mission"
+AIRGAP_EXTRACT_DIR="/opt/ourbox/installer/cache/airgap-platform"
 DEFAULTS_ENV="/opt/ourbox/installer/defaults.env"
-OVERRIDE_ENV="/boot/firmware/ourbox-installer.env"
 
-OS_REPO=""
-OS_TARGET=""
-OS_CHANNEL=""
-OS_DEFAULT_REF=""
-OS_CATALOG_ENABLED=1
-OS_CATALOG_TAG=""
-OS_ARTIFACT_TYPE=""
-OS_ORAS_VERSION=""
-OS_REF=""
-OS_REGISTRY_USERNAME=""
-OS_REGISTRY_PASSWORD=""
-AIRGAP_PLATFORM_REPO=""
-AIRGAP_PLATFORM_ARCH=""
-AIRGAP_PLATFORM_CHANNEL=""
-AIRGAP_PLATFORM_REF=""
-AIRGAP_PLATFORM_DEFAULT_REF=""
-AIRGAP_PLATFORM_CATALOG_ENABLED=1
-AIRGAP_PLATFORM_CATALOG_TAG=""
-AIRGAP_PLATFORM_CHANNEL_STABLE_TAG=""
-AIRGAP_PLATFORM_CHANNEL_BETA_TAG=""
-AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG=""
-AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG=""
-AIRGAP_PLATFORM_REGISTRY_USERNAME=""
-AIRGAP_PLATFORM_REGISTRY_PASSWORD=""
-INSTALL_DEFAULTS_REF=""
 INSTALLER_ID=""
-CHANNEL_STABLE_TAG=""
-CHANNEL_BETA_TAG=""
-CHANNEL_NIGHTLY_TAG=""
-CHANNEL_EXP_LABS_TAG=""
-INSTALL_DEFAULTS_PROFILE=""
-SELECTED_REF=""
+INSTALLER_VERSION=""
+INSTALLER_GIT_HASH=""
+OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE="0"
+
+OS_ARTIFACT_REF=""
+OS_ARTIFACT_DIGEST=""
+OS_ARTIFACT_SOURCE="mission"
 PAYLOAD_PATH=""
 PAYLOAD_SHA256=""
 PAYLOAD_META=""
-OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE="0"
-INSTALLER_VERSION=""
-INSTALLER_GIT_HASH=""
 INSTALL_SELECTION_SOURCE=""
 RELEASE_CHANNEL=""
-PULL_REF=""
-OS_ARTIFACT_SOURCE="registry"
-OS_ARTIFACT_REF=""
-OS_ARTIFACT_DIGEST=""
-AIRGAP_PLATFORM_SELECTED_REF=""
-AIRGAP_PLATFORM_SELECTION_SOURCE=""
-AIRGAP_PLATFORM_RELEASE_CHANNEL=""
-AIRGAP_PLATFORM_PULL_REF=""
-REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST=""
-BAKED_AIRGAP_PLATFORM_REF=""
-BAKED_AIRGAP_PLATFORM_DIGEST=""
-BAKED_AIRGAP_PLATFORM_SOURCE=""
-BAKED_AIRGAP_PLATFORM_REVISION=""
-BAKED_AIRGAP_PLATFORM_VERSION=""
-BAKED_AIRGAP_PLATFORM_CREATED=""
-BAKED_AIRGAP_PLATFORM_ARCH=""
-BAKED_AIRGAP_PLATFORM_PROFILE=""
-BAKED_AIRGAP_PLATFORM_K3S_VERSION=""
-BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=""
+PLATFORM_CONTRACT_DIGEST=""
+
 OURBOX_AIRGAP_PLATFORM_SOURCE=""
 OURBOX_AIRGAP_PLATFORM_REVISION=""
 OURBOX_AIRGAP_PLATFORM_VERSION=""
@@ -114,11 +64,13 @@ OURBOX_AIRGAP_PLATFORM_ARCH=""
 OURBOX_AIRGAP_PLATFORM_PROFILE=""
 OURBOX_AIRGAP_PLATFORM_K3S_VERSION=""
 OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=""
-OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=""
+OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="mission"
 OURBOX_AIRGAP_PLATFORM_REF=""
 OURBOX_AIRGAP_PLATFORM_DIGEST=""
 OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=""
 OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=""
+AIRGAP_MANIFEST_PATH=""
+
 IDENTITY_USERNAME="ourbox"
 IDENTITY_PASSWORD_HASH=""
 # shellcheck disable=SC2034  # consumed by sourced storage-flow helper
@@ -126,8 +78,6 @@ MATCHBOX_DATA_CHECK_MP="${DATA_CHECK_MP}"
 
 # shellcheck disable=SC1091
 source /opt/ourbox/tools/matchbox-storage-flow.sh
-# shellcheck disable=SC1091
-source /opt/ourbox/tools/installer-selection-resolver.sh
 
 cleanup_mounts() {
   matchbox_cleanup_data_check_mp
@@ -140,7 +90,7 @@ cleanup_mounts() {
 }
 
 cleanup_temp() {
-  rm -rf "${PAYLOAD_DIR}" "${CATALOG_DIR}" "${AIRGAP_CATALOG_DIR}" "${AIRGAP_PULL_DIR}" "${AIRGAP_OVERRIDE_DIR}" "${INSTALL_DEFAULTS_DIR}" "${INSTALL_DEFAULTS_EXTRACT_DIR}"
+  rm -rf "${AIRGAP_EXTRACT_DIR}"
 }
 
 finalize() {
@@ -210,7 +160,6 @@ prompt_password_hash() {
   done
 }
 
-# shellcheck disable=SC2317  # banner is reached from the interactive main flow
 banner() {
   local ip=""
 
@@ -223,6 +172,7 @@ banner() {
     echo "Network IP    : ${ip}"
   fi
   echo "Installer log : ${INSTALLER_LOG}"
+  echo "Mission root  : ${MISSION_ROOT}"
   echo "=================================================================="
   echo
 }
@@ -252,7 +202,7 @@ show_install_plan() {
     echo "  Apps lane   : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
   fi
   echo "  Apps digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
-  echo "  Contract    : ${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   if [[ "${MATCHBOX_SYSTEM_DISK_WAS_DATA}" == "1" ]]; then
     echo "  Note        : selected SYSTEM disk currently carries OURBOX_DATA and will be cleared"
@@ -279,7 +229,7 @@ show_completion_summary() {
     echo "  Apps lane   : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
   fi
   echo "  Apps digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
-  echo "  Contract    : ${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   echo
 }
@@ -295,268 +245,155 @@ matchbox_partition_path() {
   fi
 }
 
-normalize_payload_config() {
-  OS_REPO="${OS_REPO:-ghcr.io/techofourown/ourbox-matchbox-os}"
-  OS_TARGET="${OS_TARGET:-rpi}"
-  OS_CHANNEL="${OS_CHANNEL:-stable}"
-  OS_DEFAULT_REF="${OS_DEFAULT_REF:-}"
-  OS_CATALOG_ENABLED="${OS_CATALOG_ENABLED:-1}"
-  OS_CATALOG_TAG="${OS_CATALOG_TAG:-${OS_TARGET}-catalog}"
-  OS_ARTIFACT_TYPE="${OS_ARTIFACT_TYPE:-application/vnd.ourbox.matchbox.os-image.v1}"
-  OS_ORAS_VERSION="${OS_ORAS_VERSION:-1.3.0}"
-  OS_REF="${OS_REF:-}"
-  OS_REGISTRY_USERNAME="${OS_REGISTRY_USERNAME:-}"
-  OS_REGISTRY_PASSWORD="${OS_REGISTRY_PASSWORD:-}"
-  INSTALL_DEFAULTS_REF="${INSTALL_DEFAULTS_REF:-ghcr.io/techofourown/sw-ourbox-os/install-defaults:stable}"
-  INSTALLER_ID="${INSTALLER_ID:-matchbox}"
-  CHANNEL_STABLE_TAG="${CHANNEL_STABLE_TAG:-${OS_TARGET}-stable}"
-  CHANNEL_BETA_TAG="${CHANNEL_BETA_TAG:-${OS_TARGET}-beta}"
-  CHANNEL_NIGHTLY_TAG="${CHANNEL_NIGHTLY_TAG:-${OS_TARGET}-nightly}"
-  CHANNEL_EXP_LABS_TAG="${CHANNEL_EXP_LABS_TAG:-${OS_TARGET}-exp-labs}"
-  OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE="${OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE:-0}"
-  INSTALLER_VERSION="${INSTALLER_VERSION:-unknown}"
-  INSTALLER_GIT_HASH="${INSTALLER_GIT_HASH:-unknown}"
-}
-
-normalize_airgap_platform_config() {
-  AIRGAP_PLATFORM_REPO="${AIRGAP_PLATFORM_REPO:-ghcr.io/techofourown/sw-ourbox-os/airgap-platform}"
-  AIRGAP_PLATFORM_ARCH="${AIRGAP_PLATFORM_ARCH:-arm64}"
-  AIRGAP_PLATFORM_CHANNEL="${AIRGAP_PLATFORM_CHANNEL:-stable}"
-  AIRGAP_PLATFORM_REF="${AIRGAP_PLATFORM_REF:-}"
-  AIRGAP_PLATFORM_DEFAULT_REF="${AIRGAP_PLATFORM_DEFAULT_REF:-}"
-  AIRGAP_PLATFORM_CATALOG_ENABLED="${AIRGAP_PLATFORM_CATALOG_ENABLED:-1}"
-  AIRGAP_PLATFORM_CATALOG_TAG="${AIRGAP_PLATFORM_CATALOG_TAG:-catalog-${AIRGAP_PLATFORM_ARCH}}"
-  AIRGAP_PLATFORM_CHANNEL_STABLE_TAG="${AIRGAP_PLATFORM_CHANNEL_STABLE_TAG:-stable-${AIRGAP_PLATFORM_ARCH}}"
-  AIRGAP_PLATFORM_CHANNEL_BETA_TAG="${AIRGAP_PLATFORM_CHANNEL_BETA_TAG:-beta-${AIRGAP_PLATFORM_ARCH}}"
-  AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG="${AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG:-nightly-${AIRGAP_PLATFORM_ARCH}}"
-  AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG="${AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG:-exp-labs-${AIRGAP_PLATFORM_ARCH}}"
-  AIRGAP_PLATFORM_REGISTRY_USERNAME="${AIRGAP_PLATFORM_REGISTRY_USERNAME:-}"
-  AIRGAP_PLATFORM_REGISTRY_PASSWORD="${AIRGAP_PLATFORM_REGISTRY_PASSWORD:-}"
-}
-
-teardown_installer_ssh() {
-  [[ "${OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE}" == "1" ]] || {
-    log "Installer SSH teardown disabled."
-    return 0
-  }
-
-  systemctl stop ssh >/dev/null 2>&1 || true
-  log "Installer SSH service stopped for this session."
-}
-
-load_payload_config() {
-
-  # shellcheck disable=SC1090
-  [[ -f "${DEFAULTS_ENV}" ]] && source "${DEFAULTS_ENV}"
-  # shellcheck disable=SC1090
-  [[ -f "${OVERRIDE_ENV}" ]] && source "${OVERRIDE_ENV}"
-
-  normalize_payload_config
-  normalize_airgap_platform_config
-}
-
-load_remote_install_defaults() {
-  INSTALL_DEFAULTS_PROFILE=""
-
-  ourbox_selection_load_remote_install_defaults \
-    "${INSTALL_DEFAULTS_DIR}" \
-    "${INSTALL_DEFAULTS_EXTRACT_DIR}" \
-    "${OVERRIDE_ENV}"
-
-  if [[ "${OURBOX_INSTALL_DEFAULTS_SOURCE}" == "remote" ]]; then
-    INSTALL_DEFAULTS_PROFILE="${OURBOX_INSTALL_DEFAULTS_PROFILE}"
-  fi
-  normalize_airgap_platform_config
-}
-
-map_arch() {
-  case "$(uname -m)" in
-    x86_64) echo "amd64" ;;
-    aarch64|arm64) echo "arm64" ;;
-    *) die "unsupported architecture: $(uname -m)" ;;
-  esac
-}
-
-ensure_oras() {
-  local desired="v${OS_ORAS_VERSION}"
-  if command -v oras >/dev/null 2>&1; then
-    local current
-    current="$(oras version 2>/dev/null | awk '/Version:/ {print $2}' || true)"
-    if [[ "${current}" == "${OS_ORAS_VERSION}" || "${current}" == "${desired#v}" ]]; then
-      log "ORAS already present (${current})"
-      return 0
-    fi
-    log "ORAS present but not ${OS_ORAS_VERSION}; upgrading"
-  else
-    log "Installing ORAS ${OS_ORAS_VERSION}"
-  fi
-
-  local arch url tmpdir
-  arch="$(map_arch)"
-  url="https://github.com/oras-project/oras/releases/download/v${OS_ORAS_VERSION}/oras_${OS_ORAS_VERSION}_linux_${arch}.tar.gz"
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf "${tmpdir}"' RETURN
-  curl -fsSL -o "${tmpdir}/oras.tgz" "${url}"
-  tar -C "${tmpdir}" -xzf "${tmpdir}/oras.tgz" oras
-  install -m 0755 "${tmpdir}/oras" /usr/local/bin/oras
-  trap - RETURN
-  rm -rf "${tmpdir}"
-  log "ORAS installed: $(oras version 2>/dev/null | tr -d "$(printf '\r')")"
-}
-
-maybe_oras_login() {
-  if [[ -n "${OS_REGISTRY_USERNAME}" ]]; then
-    log "Logging into registry for ${OS_REPO}"
-    oras login "$(echo "${OS_REPO}" | cut -d/ -f1)" -u "${OS_REGISTRY_USERNAME}" --password "${OS_REGISTRY_PASSWORD:-}" >/dev/null
-  fi
-}
-
-maybe_airgap_oras_login() {
-  if [[ -n "${AIRGAP_PLATFORM_REGISTRY_USERNAME}" ]]; then
-    log "Logging into registry for ${AIRGAP_PLATFORM_REPO}"
-    oras login "$(echo "${AIRGAP_PLATFORM_REPO}" | cut -d/ -f1)" -u "${AIRGAP_PLATFORM_REGISTRY_USERNAME}" --password "${AIRGAP_PLATFORM_REGISTRY_PASSWORD:-}" >/dev/null
-  fi
-}
-
-ensure_dirs() {
-  cleanup_temp
-  mkdir -p "${PAYLOAD_DIR}" "${CATALOG_DIR}" "${AIRGAP_CATALOG_DIR}"
-}
-
-wait_for_network() {
-  local retries=40
-  local ok=0
-  for _i in $(seq 1 "${retries}"); do
-    if ip -o -4 addr show up scope global | grep -q .; then
-      ok=1
-      break
-    fi
-    sleep 0.5
-  done
-  [[ "${ok}" -eq 1 ]] || die "network not ready (no global IPv4 after ${retries} attempts)"
-}
-
-select_payload_ref() {
-  ourbox_selection_interactive_select_ref "${CATALOG_DIR}"
-  SELECTED_REF="${OURBOX_SELECTED_REF}"
-  INSTALL_SELECTION_SOURCE="${OURBOX_INSTALL_SELECTION_SOURCE}"
-  RELEASE_CHANNEL="${OURBOX_RELEASE_CHANNEL}"
-}
-
 parse_sha256_file() {
   local file="$1"
   awk 'NF>=1 {print $1; exit}' "${file}"
 }
 
-finalize_selected_payload_ref() {
-  ourbox_selection_finalize_registry_ref "${SELECTED_REF}"
-  PULL_REF="${OURBOX_PULL_REF}"
-  OS_ARTIFACT_SOURCE="${OURBOX_OS_ARTIFACT_SOURCE}"
-  OS_ARTIFACT_REF="${OURBOX_OS_ARTIFACT_REF}"
-  OS_ARTIFACT_DIGEST="${OURBOX_OS_ARTIFACT_DIGEST}"
+normalize_installer_config() {
+  INSTALLER_ID="${INSTALLER_ID:-matchbox}"
+  INSTALLER_VERSION="${INSTALLER_VERSION:-unknown}"
+  INSTALLER_GIT_HASH="${INSTALLER_GIT_HASH:-unknown}"
+  OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE="${OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE:-0}"
 }
 
-pull_payload() {
-  rm -rf "${PAYLOAD_DIR}"
-  mkdir -p "${PAYLOAD_DIR}"
-  log "Pulling OS payload: ${PULL_REF}"
-  oras pull "${PULL_REF}" -o "${PAYLOAD_DIR}"
+load_installer_config() {
+  # shellcheck disable=SC1090
+  [[ -f "${DEFAULTS_ENV}" ]] && source "${DEFAULTS_ENV}"
+  normalize_installer_config
+}
 
-  PAYLOAD_PATH="${PAYLOAD_DIR}/os.img.xz"
-  [[ -f "${PAYLOAD_PATH}" ]] || die "oras pull succeeded but os.img.xz missing from payload"
+load_local_mission() {
+  local mission_dump=""
 
-  PAYLOAD_META="${PAYLOAD_DIR}/os.meta.env"
+  [[ -f "${MISSION_ROOT}/mission-manifest.json" ]] || die "mission-manifest.json missing from ${MISSION_ROOT}"
 
-  local sha_file="${PAYLOAD_DIR}/os.img.xz.sha256"
-  [[ -f "${sha_file}" ]] || die "payload missing os.img.xz.sha256"
-  PAYLOAD_SHA256="$(parse_sha256_file "${sha_file}")"
+  mission_dump="$(
+    python3 - <<'PY' "${MISSION_ROOT}/mission-manifest.json"
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    manifest = json.load(handle)
+
+if manifest.get("schema") != 1 or manifest.get("kind") != "ourbox-mission":
+    raise SystemExit("mission-manifest.json must declare schema=1 and kind=ourbox-mission")
+target = manifest.get("target") or {}
+if target.get("id") != "matchbox":
+    raise SystemExit("mission target id must be matchbox")
+
+selected_os = manifest.get("selected_os") or {}
+selected_airgap = manifest.get("selected_airgap") or {}
+platform_contract = manifest.get("platform_contract") or {}
+
+values = [
+    str(selected_os.get("selection_source", "")).strip(),
+    str(selected_os.get("release_channel", "")).strip(),
+    str(selected_os.get("artifact_ref", "")).strip(),
+    str(selected_os.get("artifact_digest", "")).strip(),
+    str((selected_os.get("payload") or {}).get("relpath", "")).strip(),
+    str(selected_os.get("metadata_relpath", "")).strip(),
+    str(platform_contract.get("digest", "")).strip(),
+    str(selected_airgap.get("selection_source", "")).strip(),
+    str(selected_airgap.get("release_channel", "")).strip(),
+    str(selected_airgap.get("artifact_ref", "")).strip(),
+    str(selected_airgap.get("artifact_digest", "")).strip(),
+    str(selected_airgap.get("payload_relpath", "")).strip(),
+    str(selected_airgap.get("manifest_relpath", "")).strip(),
+]
+print("\n".join(values))
+PY
+  )" || die "failed to parse mission-manifest.json"
+
+  local mission_fields=()
+  mapfile -t mission_fields <<<"${mission_dump}"
+  [[ "${#mission_fields[@]}" -eq 13 ]] || die "mission-manifest.json parse produced an unexpected field set"
+
+  INSTALL_SELECTION_SOURCE="${mission_fields[0]}"
+  RELEASE_CHANNEL="${mission_fields[1]}"
+  OS_ARTIFACT_REF="${mission_fields[2]}"
+  OS_ARTIFACT_DIGEST="${mission_fields[3]}"
+  PAYLOAD_PATH="${MISSION_ROOT}/${mission_fields[4]}"
+  PAYLOAD_META="${MISSION_ROOT}/${mission_fields[5]}"
+  PLATFORM_CONTRACT_DIGEST="${mission_fields[6]}"
+  OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="${mission_fields[7]}"
+  OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${mission_fields[8]}"
+  OURBOX_AIRGAP_PLATFORM_REF="${mission_fields[9]}"
+  OURBOX_AIRGAP_PLATFORM_DIGEST="${mission_fields[10]}"
+  local airgap_payload="${MISSION_ROOT}/${mission_fields[11]}"
+  AIRGAP_MANIFEST_PATH="${MISSION_ROOT}/${mission_fields[12]}"
+
+  [[ -f "${PAYLOAD_PATH}" ]] || die "mission OS payload missing: ${PAYLOAD_PATH}"
+  [[ -f "${PAYLOAD_META}" ]] || die "mission OS metadata missing: ${PAYLOAD_META}"
+  [[ -f "${airgap_payload}" ]] || die "mission application bundle missing: ${airgap_payload}"
+  [[ -f "${AIRGAP_MANIFEST_PATH}" ]] || die "mission application bundle manifest missing: ${AIRGAP_MANIFEST_PATH}"
+  [[ "${PLATFORM_CONTRACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "mission platform contract digest is invalid"
+
+  local payload_sha_file="${PAYLOAD_PATH}.sha256"
+  [[ -f "${payload_sha_file}" ]] || die "mission OS payload checksum missing: ${payload_sha_file}"
+  PAYLOAD_SHA256="$(parse_sha256_file "${payload_sha_file}")"
   PAYLOAD_SHA256="${PAYLOAD_SHA256,,}"
-  [[ "${PAYLOAD_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "invalid sha256 in os.img.xz.sha256"
+  [[ "${PAYLOAD_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "mission OS payload checksum is invalid: ${payload_sha_file}"
+  local actual_payload_sha=""
+  actual_payload_sha="$(sha256sum "${PAYLOAD_PATH}" | awk '{print $1}')"
+  [[ "${PAYLOAD_SHA256}" == "${actual_payload_sha}" ]] || die "mission OS payload SHA mismatch (expected ${PAYLOAD_SHA256}, got ${actual_payload_sha})"
 
-  local actual_sha
-  actual_sha="$(sha256sum "${PAYLOAD_PATH}" | awk '{print $1}')"
-  [[ "${PAYLOAD_SHA256}" == "${actual_sha}" ]] || die "payload SHA mismatch (expected ${PAYLOAD_SHA256}, got ${actual_sha})"
-}
-
-load_selected_payload_airgap_metadata() {
-  [[ -f "${PAYLOAD_META}" ]] || die "selected OS payload metadata missing: ${PAYLOAD_META}"
   # shellcheck disable=SC1090
   source "${PAYLOAD_META}"
+  [[ "${OURBOX_PLATFORM_CONTRACT_DIGEST:-}" == "${PLATFORM_CONTRACT_DIGEST}" ]] \
+    || die "mission OS metadata contract digest mismatch"
 
-  REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST="${OURBOX_PLATFORM_CONTRACT_DIGEST:-}"
-  [[ "${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_PLATFORM_CONTRACT_DIGEST in ${PAYLOAD_META}"
+  rm -rf "${AIRGAP_EXTRACT_DIR}"
+  mkdir -p "${AIRGAP_EXTRACT_DIR}"
+  tar -xzf "${airgap_payload}" -C "${AIRGAP_EXTRACT_DIR}"
 
-  BAKED_AIRGAP_PLATFORM_REF="${OURBOX_AIRGAP_PLATFORM_REF:-}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_REF}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_REF in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_DIGEST="${OURBOX_AIRGAP_PLATFORM_DIGEST:-}"
-  [[ "${BAKED_AIRGAP_PLATFORM_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_AIRGAP_PLATFORM_DIGEST in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_SOURCE="${OURBOX_AIRGAP_PLATFORM_SOURCE:-}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_SOURCE}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_SOURCE in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_REVISION="${OURBOX_AIRGAP_PLATFORM_REVISION:-}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_REVISION}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_REVISION in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_VERSION="${OURBOX_AIRGAP_PLATFORM_VERSION:-}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_VERSION}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_VERSION in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_CREATED="${OURBOX_AIRGAP_PLATFORM_CREATED:-}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_CREATED}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_CREATED in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_ARCH="${OURBOX_AIRGAP_PLATFORM_ARCH:-}"
-  [[ "${BAKED_AIRGAP_PLATFORM_ARCH}" == "arm64" ]] || die "selected OS payload airgap arch mismatch: expected arm64, got ${BAKED_AIRGAP_PLATFORM_ARCH:-unknown}"
-  BAKED_AIRGAP_PLATFORM_PROFILE="${OURBOX_AIRGAP_PLATFORM_PROFILE:-}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_PROFILE}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_PROFILE in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_K3S_VERSION="${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_K3S_VERSION}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_K3S_VERSION in ${PAYLOAD_META}"
-  BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-}"
-  [[ "${BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 in ${PAYLOAD_META}"
+  [[ -f "${AIRGAP_EXTRACT_DIR}/manifest.env" ]] || die "mission application bundle extract is missing manifest.env"
+  [[ -x "${AIRGAP_EXTRACT_DIR}/k3s/k3s" ]] || die "mission application bundle extract is missing k3s/k3s"
+  [[ -f "${AIRGAP_EXTRACT_DIR}/k3s/k3s-airgap-images-arm64.tar" ]] \
+    || die "mission application bundle extract is missing k3s/k3s-airgap-images-arm64.tar"
+  [[ -f "${AIRGAP_EXTRACT_DIR}/platform/images.lock.json" ]] \
+    || die "mission application bundle extract is missing platform/images.lock.json"
+  [[ -f "${AIRGAP_EXTRACT_DIR}/platform/profile.env" ]] \
+    || die "mission application bundle extract is missing platform/profile.env"
+  find "${AIRGAP_EXTRACT_DIR}/platform/images" -maxdepth 1 -type f -name '*.tar' | grep -q . \
+    || die "mission application bundle extract is missing platform image tars"
+
+  cmp -s "${AIRGAP_EXTRACT_DIR}/manifest.env" "${AIRGAP_MANIFEST_PATH}" \
+    || die "mission application bundle manifest does not match tarball manifest.env"
+
+  # shellcheck disable=SC1090
+  source "${AIRGAP_MANIFEST_PATH}"
+  [[ "${OURBOX_PLATFORM_CONTRACT_DIGEST:-}" == "${PLATFORM_CONTRACT_DIGEST}" ]] \
+    || die "mission application bundle contract digest mismatch"
+  [[ "${AIRGAP_PLATFORM_ARCH:-}" == "arm64" ]] \
+    || die "mission application bundle arch mismatch: expected arm64, got ${AIRGAP_PLATFORM_ARCH:-unknown}"
+
+  OURBOX_AIRGAP_PLATFORM_SOURCE="${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}"
+  OURBOX_AIRGAP_PLATFORM_REVISION="${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}"
+  OURBOX_AIRGAP_PLATFORM_VERSION="${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}"
+  OURBOX_AIRGAP_PLATFORM_CREATED="${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}"
+  OURBOX_AIRGAP_PLATFORM_ARCH="${AIRGAP_PLATFORM_ARCH:-unknown}"
+  OURBOX_AIRGAP_PLATFORM_PROFILE="${OURBOX_PLATFORM_PROFILE:-unknown}"
+  OURBOX_AIRGAP_PLATFORM_K3S_VERSION="${K3S_VERSION:-unknown}"
+  OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${OURBOX_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
 }
 
-select_airgap_platform_ref() {
-  ourbox_airgap_platform_selection_reset_state
-  ourbox_airgap_platform_selection_interactive_select_ref "${AIRGAP_CATALOG_DIR}" "${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}"
-  AIRGAP_PLATFORM_SELECTED_REF="${OURBOX_AIRGAP_PLATFORM_SELECTED_REF}"
-  AIRGAP_PLATFORM_SELECTION_SOURCE="${OURBOX_AIRGAP_PLATFORM_INSTALL_SELECTION_SOURCE}"
-  AIRGAP_PLATFORM_RELEASE_CHANNEL="${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
-}
-
-finalize_selected_airgap_platform_ref() {
-  ourbox_airgap_platform_selection_finalize_registry_ref "${AIRGAP_PLATFORM_SELECTED_REF}"
-  AIRGAP_PLATFORM_PULL_REF="${OURBOX_AIRGAP_PLATFORM_PULL_REF}"
-  OURBOX_AIRGAP_PLATFORM_REF="${OURBOX_AIRGAP_PLATFORM_ARTIFACT_REF}"
-  OURBOX_AIRGAP_PLATFORM_DIGEST="${OURBOX_AIRGAP_PLATFORM_ARTIFACT_DIGEST}"
-  OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="${AIRGAP_PLATFORM_SELECTION_SOURCE}"
-  OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${AIRGAP_PLATFORM_RELEASE_CHANNEL}"
-}
-
-pull_selected_airgap_platform_bundle() {
-  rm -rf "${AIRGAP_PULL_DIR}" "${AIRGAP_OVERRIDE_DIR}"
-
-  if [[ "${OURBOX_AIRGAP_PLATFORM_REF}" == "${BAKED_AIRGAP_PLATFORM_REF}" ]]; then
-    OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="baked"
-    OURBOX_AIRGAP_PLATFORM_SOURCE="${BAKED_AIRGAP_PLATFORM_SOURCE}"
-    OURBOX_AIRGAP_PLATFORM_REVISION="${BAKED_AIRGAP_PLATFORM_REVISION}"
-    OURBOX_AIRGAP_PLATFORM_VERSION="${BAKED_AIRGAP_PLATFORM_VERSION}"
-    OURBOX_AIRGAP_PLATFORM_CREATED="${BAKED_AIRGAP_PLATFORM_CREATED}"
-    OURBOX_AIRGAP_PLATFORM_ARCH="${BAKED_AIRGAP_PLATFORM_ARCH}"
-    OURBOX_AIRGAP_PLATFORM_PROFILE="${BAKED_AIRGAP_PLATFORM_PROFILE}"
-    OURBOX_AIRGAP_PLATFORM_K3S_VERSION="${BAKED_AIRGAP_PLATFORM_K3S_VERSION}"
-    OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256}"
-    return 0
+show_payload_metadata() {
+  echo
+  echo "Mission source   : local (${MISSION_ROOT})"
+  echo "Selection source : ${INSTALL_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${RELEASE_CHANNEL}" ]]; then
+    echo "Release channel  : ${RELEASE_CHANNEL}"
   fi
-
-  mkdir -p "${AIRGAP_PULL_DIR}" "${AIRGAP_OVERRIDE_DIR}"
-  maybe_airgap_oras_login
-  log "Pulling airgap-platform bundle: ${AIRGAP_PLATFORM_PULL_REF}"
-  oras pull "${AIRGAP_PLATFORM_PULL_REF}" -o "${AIRGAP_PULL_DIR}"
-
-  local tarball="${AIRGAP_PULL_DIR}/dist/airgap-platform.tar.gz"
-  [[ -f "${tarball}" ]] || die "oras pull succeeded but airgap-platform.tar.gz missing from ${AIRGAP_PULL_DIR}"
-
-  tar -xzf "${tarball}" -C "${AIRGAP_OVERRIDE_DIR}"
-  ourbox_airgap_platform_selection_validate_extracted_bundle "${AIRGAP_OVERRIDE_DIR}" "${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}" "arm64"
-  OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"
+  echo "Payload artifact : ${OS_ARTIFACT_REF}"
+  echo "Artifact digest  : ${OS_ARTIFACT_DIGEST}"
+  echo "Payload sha256   : ${PAYLOAD_SHA256}"
+  echo
 }
 
 show_airgap_platform_metadata() {
   echo
-  echo "Airgap platform:"
+  echo "Application bundle:"
   echo "  Selection source: ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
   if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
     echo "  Release channel : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
@@ -575,54 +412,28 @@ show_airgap_platform_metadata() {
   echo
 }
 
-show_payload_metadata() {
-  echo
-  if [[ "${OURBOX_INSTALL_DEFAULTS_SOURCE}" == "remote" ]]; then
-    echo "Install defaults : remote (${INSTALL_DEFAULTS_REF})"
-    echo "Defaults profile : ${INSTALL_DEFAULTS_PROFILE}"
-  else
-    echo "Install defaults : baked defaults"
-  fi
-  echo "Selection source: ${INSTALL_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${RELEASE_CHANNEL}" ]]; then
-    echo "Release channel : ${RELEASE_CHANNEL}"
-  fi
-  echo "Payload source  : ${SELECTED_REF}"
-  echo "Pull ref        : ${PULL_REF}"
-  echo "Artifact digest : ${OS_ARTIFACT_DIGEST}"
-  echo "Payload sha256  : ${PAYLOAD_SHA256}"
-  if [[ -f "${PAYLOAD_META}" ]]; then
-    echo "Payload metadata:"
-    while IFS='=' read -r k v; do
-      [[ -z "${k}" ]] && continue
-      printf "  %s=%s\n" "${k}" "${v}"
-    done < "${PAYLOAD_META}"
-  else
-    echo "Payload metadata: (os.meta.env not present)"
-  fi
-  echo
+teardown_installer_ssh() {
+  [[ "${OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE}" == "1" ]] || {
+    log "Installer SSH teardown disabled."
+    return 0
+  }
+
+  systemctl stop ssh >/dev/null 2>&1 || true
+  log "Installer SSH service stopped for this session."
 }
 
 overlay_selected_airgap_platform_into_mounted_root() {
-  [[ "${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-baked}" == "registry" ]] || return 0
-
   local target_airgap="${SYS_ROOT_MP}/opt/ourbox/airgap"
   local target_platform="${target_airgap}/platform"
 
-  [[ -d "${AIRGAP_OVERRIDE_DIR}/k3s" ]] || die "airgap override missing k3s directory: ${AIRGAP_OVERRIDE_DIR}/k3s"
-  [[ -d "${AIRGAP_OVERRIDE_DIR}/platform/images" ]] || die "airgap override missing platform/images directory: ${AIRGAP_OVERRIDE_DIR}/platform/images"
-  [[ -f "${AIRGAP_OVERRIDE_DIR}/platform/images.lock.json" ]] || die "airgap override missing platform/images.lock.json"
-  [[ -f "${AIRGAP_OVERRIDE_DIR}/platform/profile.env" ]] || die "airgap override missing platform/profile.env"
-  [[ -f "${AIRGAP_OVERRIDE_DIR}/manifest.env" ]] || die "airgap override missing manifest.env"
-
   install -d -m 0755 "${target_airgap}" "${target_platform}"
   rm -rf "${target_airgap}/k3s" "${target_platform}/images"
-  cp -a "${AIRGAP_OVERRIDE_DIR}/k3s" "${target_airgap}/k3s"
-  cp -a "${AIRGAP_OVERRIDE_DIR}/platform/images" "${target_platform}/images"
-  cp -f "${AIRGAP_OVERRIDE_DIR}/platform/images.lock.json" "${target_platform}/images.lock.json"
-  cp -f "${AIRGAP_OVERRIDE_DIR}/platform/profile.env" "${target_platform}/profile.env"
-  cp -f "${AIRGAP_OVERRIDE_DIR}/manifest.env" "${target_airgap}/manifest.env"
-  log "Applied airgap-platform override into installed rootfs"
+  cp -a "${AIRGAP_EXTRACT_DIR}/k3s" "${target_airgap}/k3s"
+  cp -a "${AIRGAP_EXTRACT_DIR}/platform/images" "${target_platform}/images"
+  cp -f "${AIRGAP_EXTRACT_DIR}/platform/images.lock.json" "${target_platform}/images.lock.json"
+  cp -f "${AIRGAP_EXTRACT_DIR}/platform/profile.env" "${target_platform}/profile.env"
+  cp -f "${AIRGAP_EXTRACT_DIR}/manifest.env" "${target_airgap}/manifest.env"
+  log "Applied staged application bundle into installed rootfs"
 }
 
 write_install_provenance() {
@@ -649,8 +460,8 @@ OURBOX_OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
 OURBOX_OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
 OURBOX_OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
 OURBOX_OS_IMAGE_SHA256=${PAYLOAD_SHA256:-unknown}
-OURBOX_INSTALL_DEFAULTS_SOURCE=${OURBOX_INSTALL_DEFAULTS_SOURCE:-baked}
-OURBOX_INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF:-}
+OURBOX_INSTALL_DEFAULTS_SOURCE=none
+OURBOX_INSTALL_DEFAULTS_REF=
 OURBOX_INSTALL_SELECTION_SOURCE=${INSTALL_SELECTION_SOURCE:-unknown}
 OURBOX_RELEASE_CHANNEL=${RELEASE_CHANNEL:-}
 OURBOX_AIRGAP_PLATFORM_SOURCE=${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}
@@ -673,43 +484,27 @@ EOF
 }
 
 main() {
-  local root_src root_real root_parent
+  local root_src="" root_real="" root_parent=""
   local disks=()
 
   banner
-  echo "Step 1 of 5: Resolve OS artifact"
-  echo "Checking baked defaults, optional remote install-defaults, and the selected OS payload."
+  echo "Step 1 of 4: Load local mission artifacts"
+  echo "This installer consumes only the OS payload and application bundle already staged on the media."
   echo
 
-  load_payload_config
-  ensure_dirs
-  wait_for_network
-  ensure_oras
-  maybe_oras_login
-  load_remote_install_defaults
-  maybe_oras_login
-  select_payload_ref
-  finalize_selected_payload_ref
-  pull_payload
+  load_installer_config
+  cleanup_temp
+  load_local_mission
 
   log "Verifying compressed payload integrity"
   xz -t "${PAYLOAD_PATH}"
-  load_selected_payload_airgap_metadata
 
   banner
   show_payload_metadata
-
-  banner
-  echo "Step 2 of 5: Resolve airgap-platform bundle"
-  echo "Browsing contract-matching app bundles after OS selection."
-  echo
-  select_airgap_platform_ref
-  finalize_selected_airgap_platform_ref
-  pull_selected_airgap_platform_bundle
   show_airgap_platform_metadata
 
   banner
-  echo "Step 3 of 5: Review storage plan"
+  echo "Step 2 of 4: Review storage plan"
   echo "Matchbox requires exactly two NVMe disks: one SYSTEM disk and one DATA disk."
   echo
 
@@ -744,7 +539,7 @@ main() {
   matchbox_prepare_storage_layout "${disks[@]}"
 
   banner
-  echo "Step 4 of 5: Set identity for the installed system"
+  echo "Step 3 of 4: Set identity for the installed system"
   echo "(You can change the username or password later on the installed system.)"
   echo
 
@@ -754,32 +549,19 @@ main() {
   IDENTITY_PASSWORD_HASH="$(prompt_password_hash)"
 
   banner
-  echo "Step 5 of 5: Confirm and flash"
+  echo "Step 4 of 4: Confirm and flash"
   echo
   show_install_plan
   echo "WARNING: ALL DATA ON ${MATCHBOX_SYSTEM_DISK} WILL BE PERMANENTLY ERASED."
-  case "${MATCHBOX_DATA_ACTION}" in
-    init-data|erase-data)
-      echo "WARNING: ${MATCHBOX_DATA_DISK} will also be erased and recreated as LABEL=OURBOX_DATA."
-      ;;
-    reset-bootstrap)
-      echo "DATA on ${MATCHBOX_DATA_DISK} will be preserved, but bootstrap.done will be removed."
-      ;;
-    keep-data)
-      echo "DATA on ${MATCHBOX_DATA_DISK} will be preserved."
-      ;;
-  esac
   echo
-  prompt_confirm_exact "INSTALL" "Type INSTALL to begin (or Ctrl-C to abort):"
+  prompt_confirm_exact "INSTALL" "Type INSTALL to begin:"
 
   matchbox_apply_storage_layout
 
   log "Flashing payload to SYSTEM"
   xzcat "${PAYLOAD_PATH}" | dd of="${MATCHBOX_SYSTEM_DISK}" bs=4M conv=fsync status=progress
   sync
-
   partprobe "${MATCHBOX_SYSTEM_DISK}" || true
-  lsblk -f "${MATCHBOX_SYSTEM_DISK}"
 
   mkdir -p "${SYS_BOOT_MP}"
   if mountpoint -q "${SYS_BOOT_MP}"; then
@@ -792,14 +574,14 @@ main() {
   umount "${SYS_BOOT_MP}"
   log "userconf written"
 
+  log "Applying identity and provenance"
   write_install_provenance "${MATCHBOX_SYSTEM_DISK}"
 
   teardown_installer_ssh
+  cleanup_temp
 
-  echo
+  banner
   show_completion_summary
-  echo "Remove installer media"
-  echo "Boot from NVMe"
 }
 
 main "$@"

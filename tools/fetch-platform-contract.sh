@@ -6,22 +6,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/tools/lib.sh"
 
 # Resolve platform contract ref.
-# Priority: OURBOX_PLATFORM_CONTRACT_REF env var > release/official-inputs.env > contracts/ (legacy fallback)
+# Priority: OURBOX_PLATFORM_CONTRACT_REF env var > release/official-inputs.env
 if [[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]]; then
   REF="${OURBOX_PLATFORM_CONTRACT_REF}"
 else
   INPUTS_ENV="${ROOT}/release/official-inputs.env"
-  if [[ -f "${INPUTS_ENV}" ]]; then
-    # shellcheck disable=SC1090
-    source "${INPUTS_ENV}"
-    [[ -n "${PLATFORM_CONTRACT_REF:-}" ]] || die "PLATFORM_CONTRACT_REF not set in ${INPUTS_ENV}"
-    REF="${PLATFORM_CONTRACT_REF}"
-  else
-    # Legacy fallback: contracts/platform-contract.ref (deprecated — use release/official-inputs.env)
-    REF_FILE="${ROOT}/contracts/platform-contract.ref"
-    [[ -f "${REF_FILE}" ]] || die "Missing ${INPUTS_ENV} and no legacy ${REF_FILE} found"
-    REF="$(cat "${REF_FILE}")"
-  fi
+  [[ -f "${INPUTS_ENV}" ]] || die "missing ${INPUTS_ENV}; Matchbox platform fetch requires release/official-inputs.env or OURBOX_PLATFORM_CONTRACT_REF"
+  # shellcheck disable=SC1090
+  source "${INPUTS_ENV}"
+  [[ -n "${PLATFORM_CONTRACT_REF:-}" ]] || die "PLATFORM_CONTRACT_REF not set in ${INPUTS_ENV}"
+  REF="${PLATFORM_CONTRACT_REF}"
 fi
 
 need_cmd oras

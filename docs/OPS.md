@@ -43,13 +43,13 @@ Desktop command:
 ```
 
 The script is interactive and defaults to pulling a published installer artifact
-from registry, verifying checksum, then flashing selected removable/USB media.
+from registry, verifying checksum, composing a local mission, and then flashing
+selected removable/USB media.
 
-For local source builds (maintainer/debug path), use:
-
-```bash
-./tools/prepare-installer-media.sh --build-local
-```
+This wrapper now delegates to `sw-ourbox-installer --target matchbox`.
+The host chooses the OS payload and the arm64 application bundle up front, stages
+them into mission media, and the target installer consumes only those embedded
+local bytes.
 
 Pi boot steps:
 
@@ -81,25 +81,20 @@ git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchb
 cd img-ourbox-matchbox
 ```
 
-2. Run the end-to-end operator script:
+2. Compose and flash Matchbox mission media:
 
 ```bash
-./tools/ops-e2e.sh
+./tools/prepare-installer-media.sh
 ```
 
-That script will:
+That flow will:
 
-* install Podman + BuildKit + required host tools (idempotent)
-* pull pinned platform artifacts (`airgap-platform` + `platform-contract`) by OCI ref from `contracts/*.ref`
-* build the OS image
-* scan for NVMe disks and refuse to proceed unless there are exactly two
-* show both NVMe disks and require you to choose which becomes SYSTEM
-* assign the other NVMe disk as DATA for this install
-* if the chosen SYSTEM disk currently carries `OURBOX_DATA`, force an explicit repurpose confirmation before it is wiped
-* if the chosen DATA disk already has OurBox state, force you to choose: RESET-BOOTSTRAP / ERASE-DATA / KEEP-DATA before flashing SYSTEM
-* require multiple explicit confirmations before wiping SYSTEM
-* wipe SYSTEM disk signatures (works even if already partitioned), then flash the OS image to the raw NVMe disk
-* prompt you for username and password (writes `userconf.txt` to the boot partition)
+* call the unified host-side composer in `sw-ourbox-installer`
+* select the Matchbox OS payload on the host
+* select the Matchbox application bundle on the host
+* embed the staged mission into the published Matchbox installer substrate
+* flash the composed mission media to removable USB media
+* hand off to the Matchbox target installer for disk planning, identity, and final confirmation
 
 When it finishes, power down, remove SD (or fix boot order), and boot from the NVMe SYSTEM disk.
 
@@ -202,20 +197,11 @@ Catalog:
 - Channel tags are appended to a TSV catalog `${OURBOX_TARGET}-catalog` so installers can list builds
   without downloading full images.
 
-Installer runtime:
-- Default fetch: `${OS_REPO}:${OS_TARGET}-stable`
-- Override by editing `/boot/firmware/ourbox-installer.env` on the installer media:
-
-```bash
-OS_REPO=ghcr.io/your-org/ourbox-matchbox-os
-OS_TARGET=rpi
-OS_CHANNEL=beta             # or set OS_REF=repo@sha256:...
-OS_REGISTRY_USERNAME=...
-OS_REGISTRY_PASSWORD=...
-OS_CATALOG_ENABLED=1
-```
-
-During install you can press `l` to list catalog entries or `r` to paste a custom ref.
+Installer substrate:
+- The published Matchbox installer artifact is substrate only.
+- It carries the Matchbox runtime installer plus `/opt/ourbox/installer/defaults.env`.
+- Mission composition happens later on the host through `sw-ourbox-installer`.
+- The target installer does not fetch OS payloads or browse catalogs at runtime.
 
 ---
 
@@ -249,7 +235,8 @@ rm -rf ./deploy-installer-from-registry
 xz -t ./deploy-installer-from-registry/installer.img.xz
 ```
 
-`./tools/prepare-installer-media.sh` uses this pull path by default.
+`./tools/prepare-installer-media.sh` uses this published installer substrate as the
+base image and then embeds the selected mission on the host.
 
 ---
 
