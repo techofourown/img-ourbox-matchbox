@@ -6,7 +6,7 @@ LIB_SH="${SCRIPT_DIR}/lib.sh"
 if [[ ! -f "${LIB_SH}" ]]; then
   LIB_SH="$(cd "${SCRIPT_DIR}/.." && pwd)/tools/lib.sh"
 fi
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090,SC1091
 source "${LIB_SH}"
 
 if [[ "${OURBOX_FLASH_HELPER_SELFTEST:-0}" == "1" ]]; then
