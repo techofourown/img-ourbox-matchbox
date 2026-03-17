@@ -1,3 +1,15 @@
+## [0.13.4](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.3...v0.13.4) (2026-03-17)
+
+
+### Bug Fixes
+
+* address matchbox host-compose review findings ([ba9f645](https://github.com/techofourown/img-ourbox-matchbox/commit/ba9f645a33700e9a530d5a1bc46834cfff0648b1))
+* correct matchbox manifest field parsing ([2689d2b](https://github.com/techofourown/img-ourbox-matchbox/commit/2689d2b3279d0856e5042cef957df912ca20be9b))
+* harden matchbox media adapter helpers ([9c864dc](https://github.com/techofourown/img-ourbox-matchbox/commit/9c864dc667a789bfa3a13724edeea8966537e73e))
+* restore matchbox installer script modes ([0d53088](https://github.com/techofourown/img-ourbox-matchbox/commit/0d53088d8abd1489372b65899858f24101f9ed3d))
+* satisfy matchbox substrate shellcheck ([df9803d](https://github.com/techofourown/img-ourbox-matchbox/commit/df9803d182b6b31aa1468ec8ff7864213d6e2475))
+* silence flash helper shellcheck ([54b749e](https://github.com/techofourown/img-ourbox-matchbox/commit/54b749ed1ad8e78035592761906817d135abac9c))
+
 ## [0.13.3](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.2...v0.13.3) (2026-03-14)
 
 
