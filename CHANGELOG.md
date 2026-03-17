@@ -1,3 +1,10 @@
+## [0.13.5](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.4...v0.13.5) (2026-03-17)
+
+
+### Bug Fixes
+
+* harden installer substrate smoke probe ([40cbf12](https://github.com/techofourown/img-ourbox-matchbox/commit/40cbf12ae0b7fb17067a02e7f206d9468dac9bdc))
+
 ## [0.13.4](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.3...v0.13.4) (2026-03-17)
 
 
