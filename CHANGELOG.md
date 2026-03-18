@@ -1,3 +1,10 @@
+## [0.13.7](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.6...v0.13.7) (2026-03-18)
+
+
+### Bug Fixes
+
+* advance to platform-contract v0.21.1, guard runtime surface shape ([4b261d8](https://github.com/techofourown/img-ourbox-matchbox/commit/4b261d8af98b6f36a8c297d1b1554eabcea13899))
+
 ## [0.13.6](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.5...v0.13.6) (2026-03-18)
 
 
