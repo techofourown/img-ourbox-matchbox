@@ -1,3 +1,11 @@
+## [0.13.6](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.5...v0.13.6) (2026-03-18)
+
+
+### Bug Fixes
+
+* harden installer smoke loop attach ([3f7e037](https://github.com/techofourown/img-ourbox-matchbox/commit/3f7e0370a89928aaf7e82eee1b09dd34f94a9227))
+* retain loop devices until detach succeeds ([c0b982a](https://github.com/techofourown/img-ourbox-matchbox/commit/c0b982a9a7fc3a6a6b4eec55032b00c4714e6727))
+
 ## [0.13.5](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.4...v0.13.5) (2026-03-17)
 
 
