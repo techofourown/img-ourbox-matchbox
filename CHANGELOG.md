@@ -1,3 +1,10 @@
+## [0.13.8](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.7...v0.13.8) (2026-03-18)
+
+
+### Bug Fixes
+
+* replace loop-device substrate smoke with debugfs ([ef4a45f](https://github.com/techofourown/img-ourbox-matchbox/commit/ef4a45f95d6f37787b08b2ffd26e3458383a9520))
+
 ## [0.13.7](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.6...v0.13.7) (2026-03-18)
 
 
