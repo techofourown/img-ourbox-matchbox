@@ -11,9 +11,11 @@ make_contract_base() {
   mkdir -p \
     "${contract_dir}/tools" \
     "${contract_dir}/profiles/demo-apps" \
-    "${contract_dir}/manifests"
+    "${contract_dir}/manifests" \
+    "${contract_dir}/rendered/defaults/demo-apps"
 
   : > "${contract_dir}/contract.env"
+  : > "${contract_dir}/rendered/defaults/demo-apps/selected-app-surface.json"
   : > "${contract_dir}/tools/check-target-prereqs.sh"
   : > "${contract_dir}/tools/contract-identity.sh"
   : > "${contract_dir}/tools/render-contract.py"
