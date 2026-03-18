@@ -53,6 +53,35 @@ print_loop_diagnostics() {
   ls -l /dev/loop* >&2 || true
 }
 
+detach_loop_device() {
+  local dev="$1"
+  local attempt rc=0
+
+  [[ -n "${dev}" ]] || return 0
+
+  for attempt in $(seq 1 5); do
+    set +e
+    ${SUDO} losetup -d "${dev}" >/dev/null 2>&1
+    rc=$?
+    set -e
+
+    if [[ ${rc} -eq 0 ]]; then
+      if [[ "${LOOPDEV}" == "${dev}" ]]; then
+        LOOPDEV=""
+      fi
+      settle_udev
+      return 0
+    fi
+
+    log "Loop detach attempt ${attempt}/5 failed for ${dev} (rc=${rc})"
+    print_loop_diagnostics
+    settle_udev
+    sleep 1
+  done
+
+  return 1
+}
+
 attach_loop_with_retry() {
   local attempt rc
   local attach_output=""
@@ -86,8 +115,9 @@ attach_loop_with_retry() {
       if [[ -s "${errfile}" ]]; then
         sed 's/^/[partx] /' "${errfile}" >&2
       fi
-      ${SUDO} losetup -d "${LOOPDEV}" >/dev/null 2>&1 || true
-      LOOPDEV=""
+      if ! detach_loop_device "${LOOPDEV}"; then
+        log "Keeping ${LOOPDEV} attached for EXIT trap cleanup after failed partition scan"
+      fi
     else
       log "Loop attach attempt ${attempt}/10 failed (rc=${rc})"
       if [[ -s "${errfile}" ]]; then
@@ -109,7 +139,10 @@ cleanup() {
     ${SUDO} umount "${MOUNT_DIR}" >/dev/null 2>&1 || true
   fi
   if [[ -n "${LOOPDEV}" ]]; then
-    ${SUDO} losetup -d "${LOOPDEV}" >/dev/null 2>&1 || true
+    if ! detach_loop_device "${LOOPDEV}"; then
+      log "WARNING: failed to detach loop device during cleanup: ${LOOPDEV}"
+      print_loop_diagnostics
+    fi
   fi
   rm -rf "${TMP}"
 }
