@@ -7,6 +7,7 @@ source "${ROOT}/tools/lib.sh"
 
 need_cmd xz
 need_cmd losetup
+need_cmd partx
 need_cmd lsblk
 need_cmd mount
 need_cmd umount
@@ -40,6 +41,69 @@ HAS_SSH_HELPER=0
 HAS_SELECTION_RESOLVER=0
 mkdir -p "${MOUNT_DIR}"
 
+settle_udev() {
+  if command -v udevadm >/dev/null 2>&1; then
+    ${SUDO} udevadm settle >/dev/null 2>&1 || true
+  fi
+}
+
+print_loop_diagnostics() {
+  ${SUDO} losetup -a >&2 || true
+  ${SUDO} losetup -f >&2 || true
+  ls -l /dev/loop* >&2 || true
+}
+
+attach_loop_with_retry() {
+  local attempt rc
+  local attach_output=""
+  local errfile="${TMP}/losetup.err"
+
+  for attempt in $(seq 1 10); do
+    : > "${errfile}"
+    attach_output=""
+    rc=0
+
+    set +e
+    attach_output="$(${SUDO} losetup --find --show "${RAW_IMG}" 2>"${errfile}")"
+    rc=$?
+    set -e
+
+    if [[ ${rc} -eq 0 && -n "${attach_output}" ]]; then
+      LOOPDEV="${attach_output}"
+      : > "${errfile}"
+
+      set +e
+      ${SUDO} partx -u "${LOOPDEV}" >>"${errfile}" 2>&1
+      rc=$?
+      set -e
+
+      if [[ ${rc} -eq 0 ]]; then
+        settle_udev
+        return 0
+      fi
+
+      log "Loop partition scan attempt ${attempt}/10 failed for ${LOOPDEV} (rc=${rc})"
+      if [[ -s "${errfile}" ]]; then
+        sed 's/^/[partx] /' "${errfile}" >&2
+      fi
+      ${SUDO} losetup -d "${LOOPDEV}" >/dev/null 2>&1 || true
+      LOOPDEV=""
+    else
+      log "Loop attach attempt ${attempt}/10 failed (rc=${rc})"
+      if [[ -s "${errfile}" ]]; then
+        sed 's/^/[losetup] /' "${errfile}" >&2
+      fi
+    fi
+
+    print_loop_diagnostics
+    "${ROOT}/tools/sanitize-loopdevs.sh" || true
+    settle_udev
+    sleep 1
+  done
+
+  die "failed to attach loop device for ${IMG_XZ}"
+}
+
 cleanup() {
   if mountpoint -q "${MOUNT_DIR}" 2>/dev/null; then
     ${SUDO} umount "${MOUNT_DIR}" >/dev/null 2>&1 || true
@@ -54,11 +118,12 @@ trap cleanup EXIT
 log "Extracting raw installer image from $(basename "${IMG_XZ}")"
 xz -dc "${IMG_XZ}" > "${RAW_IMG}"
 
+log "Preflight: sanitizing loop devices before substrate smoke"
+"${ROOT}/tools/sanitize-loopdevs.sh" || true
+settle_udev
+
 log "Attaching loop device"
-LOOPDEV="$(${SUDO} losetup --find --show -Pf "${RAW_IMG}")"
-if command -v udevadm >/dev/null 2>&1; then
-  ${SUDO} udevadm settle >/dev/null 2>&1 || true
-fi
+attach_loop_with_retry
 
 wait_for_loop_parts() {
   local deadline=$((SECONDS + 30))

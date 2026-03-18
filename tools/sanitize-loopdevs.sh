@@ -43,6 +43,10 @@ if [[ -n "${stale}" ]]; then
   echo "${stale}" | xargs -r -n1 ${SUDO} losetup -d || true
 fi
 
+if command -v udevadm >/dev/null 2>&1; then
+  ${SUDO} udevadm settle >/dev/null 2>&1 || true
+fi
+
 # Verify clean state
 if ${SUDO} losetup -a 2>/dev/null | grep -Eq '\((lost|deleted)\)'; then
   log "ERROR: stale loop devices remain after attempted cleanup:"
