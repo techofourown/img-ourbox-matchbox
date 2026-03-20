@@ -86,6 +86,7 @@ find_root_partition() {
     [[ -n "${part}" ]] || continue
     if run_root mount -o ro "${part}" "${MOUNT_DIR}" >/dev/null 2>&1; then
       if [[ -f "${MOUNT_DIR}/opt/ourbox/tools/ourbox-install" ]]; then
+        run_root umount "${MOUNT_DIR}" >/dev/null 2>&1 || true
         printf '%s\n' "${part}"
         return 0
       fi
@@ -102,8 +103,12 @@ mapfile -t loop_parts < <(wait_for_loop_parts)
 ROOT_PART="$(printf '%s\n' "${loop_parts[@]}" | find_root_partition || true)"
 [[ -n "${ROOT_PART}" ]] || die "failed to locate the Matchbox installer root partition in ${IMG_XZ}"
 
+log "Remounting discovered installer root partition"
+run_root mount -o ro "${ROOT_PART}" "${MOUNT_DIR}" >/dev/null 2>&1 \
+  || die "failed to mount discovered installer root partition ${ROOT_PART}"
+
 log "Reading installer defaults"
-[[ -f "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" ]] \
+run_root test -f "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" \
   || die "installer rootfs missing /opt/ourbox/installer/defaults.env"
 run_root cat "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" > "${EXTRACTED_DEFAULTS}"
 [[ -s "${EXTRACTED_DEFAULTS}" ]] \
@@ -114,10 +119,10 @@ HAS_MISSION_DIR=0
 HAS_SSH_HELPER=0
 HAS_SELECTION_RESOLVER=0
 
-[[ -f "${MOUNT_DIR}/opt/ourbox/tools/ourbox-install" ]]                  && HAS_INSTALLER=1
-[[ -f "${MOUNT_DIR}/opt/ourbox/tools/installer-ssh-helper.sh" ]]         && HAS_SSH_HELPER=1
-[[ -d "${MOUNT_DIR}/opt/ourbox/mission" ]]                               && HAS_MISSION_DIR=1
-[[ -f "${MOUNT_DIR}/opt/ourbox/tools/installer-selection-resolver.sh" ]] && HAS_SELECTION_RESOLVER=1
+run_root test -f "${MOUNT_DIR}/opt/ourbox/tools/ourbox-install"                  && HAS_INSTALLER=1
+run_root test -f "${MOUNT_DIR}/opt/ourbox/tools/installer-ssh-helper.sh"         && HAS_SSH_HELPER=1
+run_root test -d "${MOUNT_DIR}/opt/ourbox/mission"                               && HAS_MISSION_DIR=1
+run_root test -f "${MOUNT_DIR}/opt/ourbox/tools/installer-selection-resolver.sh" && HAS_SELECTION_RESOLVER=1
 
 required_key() {
   local key="$1"
