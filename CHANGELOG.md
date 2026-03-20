@@ -1,3 +1,10 @@
+## [0.14.1](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.0...v0.14.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* fail closed in mirrored pin lint ([c39e4db](https://github.com/techofourown/img-ourbox-matchbox/commit/c39e4db067392e6f1ca5f0c47378eba33a385276))
+
 # [0.14.0](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.8...v0.14.0) (2026-03-20)
 
 
