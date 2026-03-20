@@ -140,6 +140,9 @@ jobs:
       - name: Check workflow trust boundaries
         run: bash tools/check-workflow-safety.sh
 
+      - name: Check for mirrored upstream pins in control-plane surfaces
+        run: bash tools/check-no-mirrored-upstream-pins.sh
+
   pr-batch-big-picture:
     name: PR batch comparison tool tests
     runs-on: ubuntu-latest
