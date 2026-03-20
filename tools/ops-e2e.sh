@@ -191,7 +191,7 @@ resolve_default_airgap_platform_ref() {
   # shellcheck disable=SC1091
   source "${ROOT}/tools/approved-upstream-inputs.upstream.env"
   need_cmd python3
-  export OURBOX_AIRGAP_PLATFORM_REF="$(
+  OURBOX_AIRGAP_PLATFORM_REF="$(
     python3 "${ROOT}/tools/release-control/release_control.py" resolve-approved-upstream-input \
       --github-repo "${SW_OURBOX_OS_APPROVED_INPUTS_REPO}" \
       --github-ref "${SW_OURBOX_OS_APPROVED_INPUTS_REVISION}" \
@@ -199,6 +199,7 @@ resolve_default_airgap_platform_ref() {
       --artifact-key matchbox_airgap_platform \
       --channel-key candidate
   )"
+  export OURBOX_AIRGAP_PLATFORM_REF
   log "Resolved airgap platform ref for ops-e2e from approved snapshot: ${OURBOX_AIRGAP_PLATFORM_REF}"
 }
 

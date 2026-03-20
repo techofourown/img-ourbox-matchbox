@@ -21,9 +21,13 @@ json="$(gh run list --repo "${REPO}" --workflow "${WORKFLOW_NAME}" --branch main
   || die "Unable to list workflow runs for ${WORKFLOW_NAME}"
 
 result="$(
-  python3 -c 'import json,sys
+  RUNS_JSON="${json}" python3 - "${SOURCE_COMMIT}" <<'PY'
+import json
+import os
+import sys
+
 source_commit = sys.argv[1]
-runs = json.load(sys.stdin)
+runs = json.loads(os.environ["RUNS_JSON"])
 matching_runs = [
     run for run in runs
     if run.get("headSha") == source_commit
@@ -52,8 +56,8 @@ failed_runs = [
 if failed_runs:
     print("failed\t")
     raise SystemExit(0)
-print("none\t")' \
-    "${SOURCE_COMMIT}" <<<"${json}"
+print("none\t")
+PY
 )"
 
 state="${result%%$'\t'*}"
