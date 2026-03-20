@@ -176,6 +176,17 @@ shopt -u nullglob
 log "Artifacts created:"
 ls -lah "${OUT}/k3s" "${OUT}/platform/images" "${OUT}/manifest.env"
 
+log "Deriving platform contract ref from airgap bundle manifest"
+BUNDLE_CONTRACT_REF="$(grep '^OURBOX_PLATFORM_CONTRACT_REF=' "${OUT}/manifest.env" | cut -d= -f2- | tr -d '\r')"
+[[ -n "${BUNDLE_CONTRACT_REF}" ]] || die "OURBOX_PLATFORM_CONTRACT_REF not found in airgap bundle manifest: ${OUT}/manifest.env"
+[[ "${BUNDLE_CONTRACT_REF}" =~ @sha256:[0-9a-f]{64}$ ]] || die "OURBOX_PLATFORM_CONTRACT_REF in bundle manifest is not digest-pinned: ${BUNDLE_CONTRACT_REF}"
+if [[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]] && [[ "${OURBOX_PLATFORM_CONTRACT_REF}" != "${BUNDLE_CONTRACT_REF}" ]]; then
+  die "requested platform contract ref does not match the selected airgap bundle.
+  requested: ${OURBOX_PLATFORM_CONTRACT_REF}
+  bundle:    ${BUNDLE_CONTRACT_REF}"
+fi
+export OURBOX_PLATFORM_CONTRACT_REF="${BUNDLE_CONTRACT_REF}"
+
 log "Fetching pinned platform contract (OCI artifact)"
 "${ROOT}/tools/fetch-platform-contract.sh"
 

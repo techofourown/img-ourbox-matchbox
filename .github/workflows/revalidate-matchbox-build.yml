@@ -45,7 +45,6 @@ jobs:
       - name: Resolve current beta upstream inputs
         run: |
           set -euo pipefail
-          echo "OURBOX_PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge)" >> "${GITHUB_ENV}"
           echo "OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:beta-arm64)" >> "${GITHUB_ENV}"
 
       - name: Fetch pinned upstream inputs

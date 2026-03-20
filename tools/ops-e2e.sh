@@ -182,6 +182,23 @@ newest_img_xz() {
   echo "${img}"
 }
 
+resolve_default_airgap_platform_ref() {
+  local repo="${OURBOX_AIRGAP_PLATFORM_REPO:-ghcr.io/techofourown/sw-ourbox-os/airgap-platform}"
+  local tag="${OURBOX_AIRGAP_PLATFORM_TAG:-beta-arm64}"
+  local digest=""
+
+  if [[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]]; then
+    log "Using preselected airgap platform ref: ${OURBOX_AIRGAP_PLATFORM_REF}"
+    return 0
+  fi
+
+  need_cmd oras
+  digest="$(oras resolve "${repo}:${tag}")"
+  [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "oras resolve returned an invalid airgap digest for ${repo}:${tag}: ${digest:-missing}"
+  export OURBOX_AIRGAP_PLATFORM_REF="${repo}@${digest}"
+  log "Resolved airgap platform ref for ops-e2e: ${OURBOX_AIRGAP_PLATFORM_REF}"
+}
+
 compute_os_artifact_ref_from_img() {
   local img="$1"
   local base
@@ -213,6 +230,8 @@ main() {
   # Prefer podman automatically (registry.sh now defaults to sudo podman when needed)
   export DOCKER="${DOCKER:-$(pick_container_cli)}"
   log "Using container CLI: ${DOCKER}"
+
+  resolve_default_airgap_platform_ref
 
   log "Fetching airgap artifacts"
   "${ROOT}/tools/fetch-airgap-platform.sh"
