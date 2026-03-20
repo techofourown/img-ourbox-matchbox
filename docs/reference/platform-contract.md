@@ -11,8 +11,11 @@ this repo.
 - `sw-ourbox-os` ADR-0009 (platform contract as OCI artifact)
 - `sw-ourbox-os` artifact docs: https://github.com/techofourown/sw-ourbox-os/blob/main/docs/architecture/artifact-distribution-and-integration.md
 - Approved upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`
-- Generated lockfile in this repo:
-  - `release/official-inputs.env` (official candidate builds)
+- Repo-local pointer to that approved snapshot:
+  - `tools/approved-upstream-inputs.upstream.env`
+
+This repo does not independently approve or redefine TOOO-produced upstream
+digests in source control.
 
 ---
 
@@ -52,12 +55,16 @@ During build, `ourbox-release` generation records platform contract provenance i
 
 ---
 
-## Updating pins
+## Updating approved inputs
 
 1. Approve the new upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`.
-2. Let the upstream sync workflow open the Matchbox lockfile PR updating `release/official-inputs.env`.
-3. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `pigen/`.
-4. Rebuild images; update release notes/changelog with the new digests.
+2. Update `tools/approved-upstream-inputs.upstream.env` to the upstream revision/path
+   that contains that approved snapshot.
+3. Let the official candidate workflow resolve exact upstream refs at workflow start.
+4. For local/manual runs outside the workflow wrappers, provide explicit
+   `OURBOX_PLATFORM_CONTRACT_REF` / `OURBOX_AIRGAP_PLATFORM_REF` values.
+5. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `pigen/`.
+6. Rebuild images; update release notes/changelog with the new digests.
 
 Host-composed installer media is separate:
 

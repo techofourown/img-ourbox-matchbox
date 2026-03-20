@@ -22,7 +22,7 @@ Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
 
 | Channel tag(s) | Artifact | Trigger |
 |---|---|---|
-| `rpi-beta` / `rpi-installer-beta` | OS image / Installer | Push to `main` using pinned `release/official-inputs.env` (heavy build) |
+| `rpi-beta` / `rpi-installer-beta` | OS image / Installer | Push to `main` using the approved upstream snapshot pinned in `tools/approved-upstream-inputs.upstream.env`; workflow resolves exact upstream refs at start (heavy build) |
 | `rpi-stable` / `rpi-installer-stable` | OS image / Installer | Promotion after both candidate completion and matching GitHub Release `published` authorization are true; whichever arrives second wakes the retag (no rebuild) |
 | `rpi-nightly` / `rpi-installer-nightly` | OS image / Installer | Scheduled integration build using floating upstream `edge` refs (heavy build) |
 | `rpi-exp-labs` / `rpi-installer-exp-labs` | OS image / Installer | Promotion after both candidate completion and matching GitHub Release `prereleased` authorization are true; whichever arrives second wakes the retag (no rebuild) |
@@ -161,25 +161,24 @@ workflow provenance record for the retag operation.
 
 ---
 
-## Upstream input pinning
+## Upstream input resolution
 
-The official candidate build consumes pinned OCI artifacts from `sw-ourbox-os` (defined in
-`release/official-inputs.env`):
+The official candidate build consumes exact OCI artifact identities from
+`sw-ourbox-os`, but this repo does not check those digests into its own
+control plane.
 
-```
-PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:<digest>
-AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:<digest>
-```
+Source-controlled intent is:
 
-These MUST be digest-pinned refs (never floating tags).
+- the approved upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`
+- the repo-local pointer to that snapshot in `tools/approved-upstream-inputs.upstream.env`
 
-The scheduled nightly integration build intentionally overrides those pins at workflow time by
-resolving the latest upstream `edge` digests before building.
+At workflow start, the official candidate build resolves that approved snapshot
+into exact digest-pinned refs for `PLATFORM_CONTRACT_REF` and
+`AIRGAP_PLATFORM_REF`. Those resolved immutable identities are then recorded in
+workflow provenance and artifact metadata.
 
-`release/official-inputs.env` is now a generated downstream lockfile. The approval point lives in
-`sw-ourbox-os/release/approved-upstream-inputs.json`, and the Matchbox lockfile is refreshed from
-that approved snapshot rather than hand-edited here. The next candidate build therefore stays
-digest-pinned while tracking a single upstream approval record instead of a repo-local copy.
+The scheduled nightly integration build intentionally bypasses the approved
+snapshot and resolves the latest upstream `edge` digests at workflow time.
 
 ---
 
@@ -212,4 +211,4 @@ TOOO-controlled publication are not official TOOO artifacts.
 - [ADR-0004: Consume Platform Contract from sw-ourbox-os](./decisions/ADR-0004-consume-platform-contract-from-sw-ourbox-os.md)
 - [OPS.md — Operator Runbook](./OPS.md)
 - `release/official-artifacts.env` — official publication targets
-- `release/official-inputs.env` — generated digest-pinned upstream lockfile
+- `tools/approved-upstream-inputs.upstream.env` — repo-local pointer to the approved upstream snapshot

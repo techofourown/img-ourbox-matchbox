@@ -3,7 +3,9 @@
 This directory is populated at build time from the pinned platform contract OCI artifact.
 
 Source of truth:
-- release/official-inputs.env (pinned platform-contract digest)
+- `sw-ourbox-os/release/approved-upstream-inputs.json` (approved upstream input intent)
+- `tools/approved-upstream-inputs.upstream.env` (repo-local pointer to that snapshot)
+- workflow-time resolved pinned platform-contract ref recorded in build provenance
 - techofourown/sw-ourbox-os (platform-contract publisher)
 
 This synced tree now includes:

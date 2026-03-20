@@ -42,6 +42,19 @@ jobs:
       - name: Bootstrap host dependencies
         run: sudo ./tools/bootstrap-host.sh
 
+      - name: Resolve current beta upstream inputs
+        run: |
+          set -euo pipefail
+          source ./tools/approved-upstream-inputs.upstream.env
+          python3 ./tools/release-control/release_control.py resolve-approved-upstream-input \
+            --github-repo "${SW_OURBOX_OS_APPROVED_INPUTS_REPO}" \
+            --github-ref "${SW_OURBOX_OS_APPROVED_INPUTS_REVISION}" \
+            --github-path "${SW_OURBOX_OS_APPROVED_INPUTS_PATH}" \
+            --artifact-key matchbox_airgap_platform \
+            --channel-key candidate \
+            --env-var OURBOX_AIRGAP_PLATFORM_REF \
+            --github-env "${GITHUB_ENV}"
+
       - name: Fetch pinned upstream inputs
         run: ./tools/fetch-airgap-platform.sh
         env:

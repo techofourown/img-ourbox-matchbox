@@ -8,6 +8,8 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +29,14 @@ def fail(message: str) -> "NoReturn":
 
 def load_json(path: str | Path) -> Any:
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def load_json_url(url: str) -> Any:
+    try:
+        with urllib.request.urlopen(url) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        fail(f"failed to fetch {url}: {exc}")
 
 
 def write_json(path: str | Path, payload: Any) -> None:
@@ -145,6 +155,78 @@ def oras_resolve(ref: str) -> str:
     if completed.returncode != 0:
         return ""
     return completed.stdout.strip()
+
+
+def github_raw_url(repo: str, ref: str, path: str) -> str:
+    ensure_non_empty_string(repo, "github repo")
+    ensure_non_empty_string(ref, "github ref")
+    ensure_non_empty_string(path, "github path")
+    return f"https://raw.githubusercontent.com/{repo}/{ref}/{path}"
+
+
+def validate_approved_upstream_inputs(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        fail("approved upstream inputs payload must be an object")
+    if payload.get("schema") != 1:
+        fail("approved upstream inputs schema must be 1")
+    if payload.get("kind") != "approved-upstream-inputs":
+        fail("approved upstream inputs kind must be 'approved-upstream-inputs'")
+
+    ensure_non_empty_string(payload.get("snapshot"), "snapshot")
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, dict) or not artifacts:
+        fail("approved upstream inputs must declare a non-empty artifacts object")
+
+    for artifact_key, artifact in artifacts.items():
+        if not isinstance(artifact_key, str) or not artifact_key:
+            fail("approved upstream inputs artifact keys must be non-empty strings")
+        if not isinstance(artifact, dict):
+            fail(f"artifacts.{artifact_key} must be an object")
+        ensure_non_empty_string(artifact.get("repo"), f"artifacts.{artifact_key}.repo")
+        channels = artifact.get("channels")
+        if not isinstance(channels, dict) or not channels:
+            fail(f"artifacts.{artifact_key}.channels must be a non-empty object")
+        for channel_key, channel_value in channels.items():
+            if not isinstance(channel_key, str) or not channel_key:
+                fail(f"artifacts.{artifact_key}.channels keys must be non-empty strings")
+            ensure_non_empty_string(channel_value, f"artifacts.{artifact_key}.channels.{channel_key}")
+
+    return payload
+
+
+def resolve_approved_upstream_input(
+    payload: dict[str, Any],
+    *,
+    artifact_key: str,
+    channel_key: str,
+) -> tuple[str, str, str]:
+    artifacts = payload["artifacts"]
+    artifact = artifacts.get(artifact_key)
+    if not isinstance(artifact, dict):
+        fail(f"approved upstream inputs has no artifact entry {artifact_key!r}")
+
+    repo = ensure_non_empty_string(artifact.get("repo"), f"artifacts.{artifact_key}.repo")
+    channels = artifact.get("channels")
+    if not isinstance(channels, dict):
+        fail(f"artifacts.{artifact_key}.channels must be an object")
+    channel = ensure_non_empty_string(
+        channels.get(channel_key),
+        f"artifacts.{artifact_key}.channels.{channel_key}",
+    )
+
+    selected_ref = f"{repo}:{channel}"
+    digest = oras_resolve(selected_ref)
+    if not DIGEST_RE.match(digest):
+        fail(f"oras resolve failed for approved upstream input {selected_ref}")
+    return payload["snapshot"], selected_ref, f"{repo}@{digest}"
+
+
+def append_env_line(path: str | Path, key: str, value: str) -> None:
+    ensure_non_empty_string(key, "env key")
+    ensure_non_empty_string(value, "env value")
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("a", encoding="utf-8") as handle:
+        handle.write(f"{key}={value}\n")
 
 
 def oras_tag(pinned_ref: str, tag: str) -> None:
@@ -305,7 +387,7 @@ def build_candidate_provenance(
     write_json(output_path, payload)
 
 
-def build_catalog_header(sha_column: str) -> str:
+def build_os_catalog_header(sha_column: str) -> str:
     if sha_column not in {"img_sha256", "payload_sha256"}:
         fail("sha-column must be img_sha256 or payload_sha256")
     return "\t".join(
@@ -321,6 +403,25 @@ def build_catalog_header(sha_column: str) -> str:
             "platform_contract_digest",
             "k3s_version",
             sha_column,
+            "artifact_digest",
+            "pinned_ref",
+        ]
+    )
+
+
+def build_substrate_catalog_header() -> str:
+    return "\t".join(
+        [
+            "channel",
+            "tag",
+            "created",
+            "version",
+            "revision",
+            "arch",
+            "platform_contract_digest",
+            "platform_profile",
+            "k3s_version",
+            "platform_images_lock_sha256",
             "artifact_digest",
             "pinned_ref",
         ]
@@ -347,7 +448,63 @@ def find_catalog_file(catalog_dir: Path) -> Path:
     return direct
 
 
-def update_catalog_from_record(
+def validate_upstream_substrate_publish_record(record: Any) -> dict[str, Any]:
+    if not isinstance(record, dict):
+        fail("artifact record must be an object")
+    if record.get("schema") != 1:
+        fail("artifact record schema must be 1")
+    if record.get("artifact_family") != "ourbox-substrate":
+        fail("artifact_family must be ourbox-substrate")
+
+    artifact_repo = ensure_non_empty_string(record.get("artifact_repo"), "artifact_repo")
+    artifact_ref = ensure_non_empty_string(record.get("artifact_ref"), "artifact_ref")
+    artifact_pinned_ref = ensure_non_empty_string(record.get("artifact_pinned_ref"), "artifact_pinned_ref")
+    artifact_digest = ensure_digest(record.get("artifact_digest"), "artifact_digest")
+    ensure_non_empty_string(record.get("artifact_type"), "artifact_type")
+    ensure_non_empty_string(record.get("source_repo"), "source_repo")
+    ensure_full_sha(record.get("source_commit"), "source_commit")
+    ensure_known_string(record.get("source_version"), "source_version")
+    ensure_non_empty_string(record.get("created"), "created")
+
+    if not artifact_ref.startswith(f"{artifact_repo}:"):
+        fail("artifact_ref must be in the artifact_repo namespace")
+    if not artifact_pinned_ref.startswith(f"{artifact_repo}@"):
+        fail("artifact_pinned_ref must be in the artifact_repo namespace")
+    if extract_digest_from_pinned_ref(artifact_pinned_ref, "artifact_pinned_ref") != artifact_digest:
+        fail("artifact_pinned_ref digest does not match artifact_digest")
+
+    artifact_metadata = validate_flat_string_map(record.get("artifact_metadata"), "artifact_metadata")
+    input_metadata = validate_flat_string_map(record.get("input_metadata"), "input_metadata")
+    validate_flat_string_map(record.get("dist_files"), "dist_files")
+
+    for key in (
+        "OURBOX_SUBSTRATE_SOURCE",
+        "OURBOX_SUBSTRATE_REVISION",
+        "OURBOX_SUBSTRATE_VERSION",
+        "OURBOX_SUBSTRATE_CREATED",
+        "OURBOX_SUBSTRATE_ARCH",
+    ):
+        ensure_non_empty_string(artifact_metadata.get(key), f"artifact_metadata.{key}")
+
+    arch = artifact_metadata["OURBOX_SUBSTRATE_ARCH"]
+    if arch not in {"arm64", "amd64"}:
+        fail("artifact_metadata.OURBOX_SUBSTRATE_ARCH must be arm64 or amd64")
+
+    ensure_known_string(input_metadata.get("K3S_VERSION"), "input_metadata.K3S_VERSION")
+    ensure_known_string(input_metadata.get("OURBOX_PLATFORM_PROFILE"), "input_metadata.OURBOX_PLATFORM_PROFILE")
+    ensure_sha_hex(
+        input_metadata.get("OURBOX_PLATFORM_IMAGES_LOCK_SHA256"),
+        "input_metadata.OURBOX_PLATFORM_IMAGES_LOCK_SHA256",
+    )
+    ensure_digest(
+        input_metadata.get("OURBOX_PLATFORM_CONTRACT_DIGEST"),
+        "input_metadata.OURBOX_PLATFORM_CONTRACT_DIGEST",
+    )
+
+    return record
+
+
+def update_os_catalog_from_record(
     artifact_record: dict[str, Any],
     *,
     artifact_repo: str,
@@ -363,7 +520,7 @@ def update_catalog_from_record(
     if record["artifact_repo"] != artifact_repo:
         fail(f"artifact record repo {record['artifact_repo']} does not match {artifact_repo}")
 
-    header = build_catalog_header(sha_column)
+    header = build_os_catalog_header(sha_column)
     immutable_tag = immutable_tag_override or extract_tag_from_ref(record["artifact_repo"], record["artifact_ref"])
     channel = normalize_channel(channel_tag, record["control_fields"]["target"], channel_mode)
     pinned_ref = record["artifact_pinned_ref"]
@@ -409,6 +566,128 @@ def update_catalog_from_record(
         )
         catalog_file.write_text("\n".join([header, *rows]) + "\n", encoding="utf-8")
         oras_push_catalog(catalog_ref, catalog_artifact_type, catalog_file.parent)
+
+
+def update_substrate_catalog_from_record(
+    artifact_record: dict[str, Any],
+    *,
+    artifact_repo: str,
+    catalog_tag: str,
+    catalog_artifact_type: str,
+    channel_tag: str,
+    channel_mode: str,
+    timestamp: str,
+    immutable_tag_override: str | None = None,
+    version_override: str | None = None,
+) -> None:
+    if channel_mode != "short":
+        fail("ourbox-substrate catalogs require channel-mode short")
+
+    record = validate_upstream_substrate_publish_record(artifact_record)
+    if record["artifact_repo"] != artifact_repo:
+        fail(f"artifact record repo {record['artifact_repo']} does not match {artifact_repo}")
+
+    header = build_substrate_catalog_header()
+    immutable_tag = immutable_tag_override or extract_tag_from_ref(record["artifact_repo"], record["artifact_ref"])
+    version = version_override or record["source_version"]
+    channel = normalize_channel(channel_tag, "", channel_mode)
+    pinned_ref = record["artifact_pinned_ref"]
+    artifact_digest = record["artifact_digest"]
+    artifact_metadata = record["artifact_metadata"]
+    input_metadata = record["input_metadata"]
+
+    with tempfile.TemporaryDirectory(prefix="release-control-catalog-") as tmpdir:
+        catalog_dir = Path(tmpdir)
+        catalog_ref = f"{artifact_repo}:{catalog_tag}"
+        pull_result = oras_pull(catalog_ref, catalog_dir)
+        if pull_result.returncode == 0:
+            catalog_file = find_catalog_file(catalog_dir)
+        elif oras_pull_is_not_found(pull_result):
+            catalog_file = catalog_dir / "catalog.tsv"
+        else:
+            detail = (pull_result.stderr or pull_result.stdout).strip() or f"exit code {pull_result.returncode}"
+            fail(f"oras pull failed for {catalog_ref}: {detail}")
+
+        existing_rows: list[str] = []
+        if catalog_file.is_file():
+            existing_rows = catalog_file.read_text(encoding="utf-8").splitlines()
+        rows = [line for line in existing_rows[1:] if line]
+        rows.append(
+            "\t".join(
+                [
+                    channel,
+                    immutable_tag,
+                    timestamp,
+                    version,
+                    record["source_commit"],
+                    artifact_metadata["OURBOX_SUBSTRATE_ARCH"],
+                    input_metadata["OURBOX_PLATFORM_CONTRACT_DIGEST"],
+                    input_metadata["OURBOX_PLATFORM_PROFILE"],
+                    input_metadata["K3S_VERSION"],
+                    input_metadata["OURBOX_PLATFORM_IMAGES_LOCK_SHA256"],
+                    artifact_digest,
+                    pinned_ref,
+                ]
+            )
+        )
+        catalog_file.write_text("\n".join([header, *rows]) + "\n", encoding="utf-8")
+        oras_push_catalog(catalog_ref, catalog_artifact_type, catalog_file.parent)
+
+
+def update_catalog_from_record(
+    artifact_record: dict[str, Any],
+    *,
+    artifact_repo: str,
+    catalog_tag: str,
+    catalog_artifact_type: str,
+    channel_tag: str,
+    channel_mode: str,
+    timestamp: str,
+    catalog_family: str | None = None,
+    sha_column: str | None = None,
+    immutable_tag_override: str | None = None,
+    version_override: str | None = None,
+) -> None:
+    detected_family = catalog_family
+    if detected_family is None:
+        if isinstance(artifact_record, dict) and artifact_record.get("artifact_role") == "os":
+            detected_family = "os"
+        elif isinstance(artifact_record, dict) and artifact_record.get("artifact_family") == "ourbox-substrate":
+            detected_family = "ourbox-substrate"
+        else:
+            fail("unable to infer catalog family from artifact record")
+
+    if detected_family == "os":
+        if sha_column is None:
+            fail("sha-column is required for OS catalogs")
+        update_os_catalog_from_record(
+            artifact_record,
+            artifact_repo=artifact_repo,
+            catalog_tag=catalog_tag,
+            catalog_artifact_type=catalog_artifact_type,
+            channel_tag=channel_tag,
+            channel_mode=channel_mode,
+            sha_column=sha_column,
+            timestamp=timestamp,
+            immutable_tag_override=immutable_tag_override,
+        )
+        return
+
+    if detected_family == "ourbox-substrate":
+        update_substrate_catalog_from_record(
+            artifact_record,
+            artifact_repo=artifact_repo,
+            catalog_tag=catalog_tag,
+            catalog_artifact_type=catalog_artifact_type,
+            channel_tag=channel_tag,
+            channel_mode=channel_mode,
+            timestamp=timestamp,
+            immutable_tag_override=immutable_tag_override,
+            version_override=version_override,
+        )
+        return
+
+    fail(f"unsupported catalog family: {detected_family}")
 
 
 def now_utc() -> str:
@@ -661,9 +940,34 @@ def cmd_update_catalog(args: argparse.Namespace) -> int:
         catalog_artifact_type=args.catalog_artifact_type,
         channel_tag=args.channel_tag,
         channel_mode=args.channel_mode,
-        sha_column=args.sha_column,
         timestamp=args.timestamp,
+        catalog_family=args.catalog_family,
+        sha_column=args.sha_column,
+        immutable_tag_override=args.immutable_tag_override,
+        version_override=args.version_override,
     )
+    return 0
+
+
+def cmd_resolve_approved_upstream_input(args: argparse.Namespace) -> int:
+    if args.input_json:
+        payload = load_json(args.input_json)
+    else:
+        payload = load_json_url(github_raw_url(args.github_repo, args.github_ref, args.github_path))
+    validated = validate_approved_upstream_inputs(payload)
+    snapshot, selected_ref, pinned_ref = resolve_approved_upstream_input(
+        validated,
+        artifact_key=args.artifact_key,
+        channel_key=args.channel_key,
+    )
+
+    if args.github_env:
+        append_env_line(args.github_env, args.env_var, pinned_ref)
+        append_env_line(args.github_env, "OURBOX_APPROVED_UPSTREAM_INPUTS_SNAPSHOT", snapshot)
+        append_env_line(args.github_env, "OURBOX_APPROVED_UPSTREAM_INPUT_SOURCE_REF", selected_ref)
+        return 0
+
+    print(pinned_ref)
     return 0
 
 
@@ -746,9 +1050,24 @@ def build_parser() -> argparse.ArgumentParser:
     update_catalog_parser.add_argument("--catalog-artifact-type", required=True)
     update_catalog_parser.add_argument("--channel-tag", required=True)
     update_catalog_parser.add_argument("--channel-mode", required=True)
-    update_catalog_parser.add_argument("--sha-column", required=True)
+    update_catalog_parser.add_argument("--catalog-family", choices=["os", "ourbox-substrate"])
+    update_catalog_parser.add_argument("--sha-column")
+    update_catalog_parser.add_argument("--immutable-tag-override")
+    update_catalog_parser.add_argument("--version-override")
     update_catalog_parser.add_argument("--timestamp", required=True)
     update_catalog_parser.set_defaults(func=cmd_update_catalog)
+
+    resolve_approved_parser = subparsers.add_parser("resolve-approved-upstream-input")
+    resolve_approved_input_group = resolve_approved_parser.add_mutually_exclusive_group(required=True)
+    resolve_approved_input_group.add_argument("--input-json")
+    resolve_approved_input_group.add_argument("--github-ref")
+    resolve_approved_parser.add_argument("--github-repo")
+    resolve_approved_parser.add_argument("--github-path")
+    resolve_approved_parser.add_argument("--artifact-key", required=True)
+    resolve_approved_parser.add_argument("--channel-key", required=True)
+    resolve_approved_parser.add_argument("--env-var", default="OURBOX_AIRGAP_PLATFORM_REF")
+    resolve_approved_parser.add_argument("--github-env")
+    resolve_approved_parser.set_defaults(func=cmd_resolve_approved_upstream_input)
 
     promote_os_parser = subparsers.add_parser("promote-os")
     promote_os_parser.add_argument("--provenance", required=True)

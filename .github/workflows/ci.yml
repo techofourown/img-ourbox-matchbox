@@ -90,6 +90,16 @@ jobs:
       - name: Run platform contract shape smoke
         run: bash tools/check-validate-platform-contract-shape-smoke.sh
 
+  upstream-input-env:
+    name: Upstream input env contract smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify fetch scripts require explicit upstream refs
+        run: bash tools/check-upstream-input-env-smoke.sh
+
   release-control-vendoring:
     name: Vendored release-control sync
     runs-on: ubuntu-latest

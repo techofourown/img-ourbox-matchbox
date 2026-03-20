@@ -182,6 +182,27 @@ newest_img_xz() {
   echo "${img}"
 }
 
+resolve_default_airgap_platform_ref() {
+  if [[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]]; then
+    log "Using preselected airgap platform ref: ${OURBOX_AIRGAP_PLATFORM_REF}"
+    return 0
+  fi
+
+  # shellcheck disable=SC1091
+  source "${ROOT}/tools/approved-upstream-inputs.upstream.env"
+  need_cmd python3
+  OURBOX_AIRGAP_PLATFORM_REF="$(
+    python3 "${ROOT}/tools/release-control/release_control.py" resolve-approved-upstream-input \
+      --github-repo "${SW_OURBOX_OS_APPROVED_INPUTS_REPO}" \
+      --github-ref "${SW_OURBOX_OS_APPROVED_INPUTS_REVISION}" \
+      --github-path "${SW_OURBOX_OS_APPROVED_INPUTS_PATH}" \
+      --artifact-key matchbox_airgap_platform \
+      --channel-key candidate
+  )"
+  export OURBOX_AIRGAP_PLATFORM_REF
+  log "Resolved airgap platform ref for ops-e2e from approved snapshot: ${OURBOX_AIRGAP_PLATFORM_REF}"
+}
+
 compute_os_artifact_ref_from_img() {
   local img="$1"
   local base
@@ -213,6 +234,8 @@ main() {
   # Prefer podman automatically (registry.sh now defaults to sudo podman when needed)
   export DOCKER="${DOCKER:-$(pick_container_cli)}"
   log "Using container CLI: ${DOCKER}"
+
+  resolve_default_airgap_platform_ref
 
   log "Fetching airgap artifacts"
   "${ROOT}/tools/fetch-airgap-platform.sh"

@@ -94,13 +94,16 @@ Official artifacts are built and published automatically once the self-hosted bu
 - GitHub Release `published` → `official-promote-stable.yml` → promote the existing candidate digest into `rpi-stable` / `rpi-installer-stable`
 - GitHub Release `prereleased` → `official-exp-labs.yml` → promote the existing candidate digest into `rpi-exp-labs` / `rpi-installer-exp-labs`
 
-Publication targets and upstream input pins are repo-defined in `release/`:
+Publication targets are repo-defined in `release/`, and upstream input intent is pinned by a
+repo-local pointer to the approved upstream snapshot:
 
 - `release/official-artifacts.env` — official GHCR repos and channel names
-- `release/official-inputs.env` — digest-pinned upstream refs (update via PR when `sw-ourbox-os` ships new bundles)
+- `tools/approved-upstream-inputs.upstream.env` — pinned pointer to the approved
+  `sw-ourbox-os` input snapshot revision/path
 
 Official Matchbox installer builds publish only the Matchbox installer substrate.
 They do not bake OS-selection defaults or target-time application-bundle defaults into
-the image. Candidate builds consume the pinned refs in `release/official-inputs.env`;
-scheduled nightly integration builds resolve the latest `sw-ourbox-os` `edge` digests
-at workflow time for the Matchbox OS image build only.
+the image. Candidate builds resolve exact upstream refs from the approved
+snapshot at workflow start. Scheduled nightly integration builds intentionally
+resolve the latest `sw-ourbox-os` `edge` digests at workflow time for the
+Matchbox OS image build only.

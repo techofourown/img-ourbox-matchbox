@@ -75,7 +75,7 @@ and the [Official Artifact Build and Provenance Policy](https://github.com/techo
 - Heavy official workflows (`official-candidate.yml`, `integration-nightly.yml`) run on `[self-hosted, official-heavy, pi-image]` runners in the `official-heavy-artifacts` org runner group
 - Promotion workflows (`official-promote-stable.yml`, `official-exp-labs.yml`) run on `ubuntu-latest` because they retag an existing digest instead of rebuilding it
 - Official artifacts are digest-addressable OCI artifacts; see `release/official-artifacts.env` for repos and channel tags
-- Upstream platform bundles are digest-pinned in `release/official-inputs.env` — update via PR when `sw-ourbox-os` ships new bundles
+- Upstream platform input intent is pinned via `tools/approved-upstream-inputs.upstream.env`; workflows resolve exact digests at start
 - See `docs/ARTIFACT_PROVENANCE.md` for the required audit record (artifact types, release channels, provenance metadata, signature status)
 
 ### Workflow safety check
