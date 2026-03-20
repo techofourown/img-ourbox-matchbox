@@ -1,3 +1,10 @@
+## [0.14.3](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.2...v0.14.3) (2026-03-20)
+
+
+### Bug Fixes
+
+* remount matchbox smoke root partition ([348cb86](https://github.com/techofourown/img-ourbox-matchbox/commit/348cb86c1122caa048c5a9432be3a4ebdb76b41b))
+
 ## [0.14.2](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.1...v0.14.2) (2026-03-20)
 
 
