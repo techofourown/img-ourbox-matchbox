@@ -1,3 +1,10 @@
+## [0.14.4](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.3...v0.14.4) (2026-03-20)
+
+
+### Bug Fixes
+
+* harden matchbox installer smoke checks ([ac8872e](https://github.com/techofourown/img-ourbox-matchbox/commit/ac8872e2f1692cedae04fd9af6839508a626fda7))
+
 ## [0.14.3](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.2...v0.14.3) (2026-03-20)
 
 
