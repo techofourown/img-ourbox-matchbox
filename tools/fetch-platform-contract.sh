@@ -6,17 +6,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/tools/lib.sh"
 
 # Resolve platform contract ref.
-# Priority: OURBOX_PLATFORM_CONTRACT_REF env var > release/official-inputs.env
-if [[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]]; then
-  REF="${OURBOX_PLATFORM_CONTRACT_REF}"
-else
-  INPUTS_ENV="${ROOT}/release/official-inputs.env"
-  [[ -f "${INPUTS_ENV}" ]] || die "missing ${INPUTS_ENV}; Matchbox platform fetch requires release/official-inputs.env or OURBOX_PLATFORM_CONTRACT_REF"
-  # shellcheck disable=SC1090
-  source "${INPUTS_ENV}"
-  [[ -n "${PLATFORM_CONTRACT_REF:-}" ]] || die "PLATFORM_CONTRACT_REF not set in ${INPUTS_ENV}"
-  REF="${PLATFORM_CONTRACT_REF}"
-fi
+# Callers must resolve channel intent at workflow/build start and pass the
+# selected immutable ref explicitly.
+[[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]] || die \
+  "OURBOX_PLATFORM_CONTRACT_REF is required.
+Resolve the upstream platform-contract channel at workflow/build start and pass
+the resulting digest-pinned ref in the environment."
+REF="${OURBOX_PLATFORM_CONTRACT_REF}"
 
 need_cmd oras
 
@@ -35,10 +31,11 @@ if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
   if [[ "${OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS:-0}" == "1" ]] || [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
     die "PLATFORM_CONTRACT_REF '${REF}' is not digest-pinned.
   Official candidate/release builds require @sha256: refs to ensure reproducibility.
-  Update the approved upstream snapshot in sw-ourbox-os instead of editing release/official-inputs.env by hand."
+  Resolve the upstream channel before calling fetch-platform-contract.sh and pass
+  the pinned ref via OURBOX_PLATFORM_CONTRACT_REF."
   elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
     log "WARNING: PLATFORM_CONTRACT_REF is not digest-pinned — nightly build will not be reproducible"
-    log "  Update the approved upstream snapshot in sw-ourbox-os once the next release is approved"
+    log "  Resolve the upstream channel before calling fetch-platform-contract.sh"
   fi
 fi
 

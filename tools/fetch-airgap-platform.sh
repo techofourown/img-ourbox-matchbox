@@ -89,17 +89,13 @@ EOF
 }
 
 # Resolve airgap platform ref.
-# Priority: OURBOX_AIRGAP_PLATFORM_REF env var > release/official-inputs.env
-if [[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]]; then
-  REF="${OURBOX_AIRGAP_PLATFORM_REF}"
-else
-  INPUTS_ENV="${ROOT}/release/official-inputs.env"
-  [[ -f "${INPUTS_ENV}" ]] || die "missing ${INPUTS_ENV}; Matchbox airgap fetch requires release/official-inputs.env or OURBOX_AIRGAP_PLATFORM_REF"
-  # shellcheck disable=SC1090
-  source "${INPUTS_ENV}"
-  [[ -n "${AIRGAP_PLATFORM_REF:-}" ]] || die "AIRGAP_PLATFORM_REF not set in ${INPUTS_ENV}"
-  REF="${AIRGAP_PLATFORM_REF}"
-fi
+# Callers must resolve channel intent at workflow/build start and pass the
+# selected immutable ref explicitly.
+[[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]] || die \
+  "OURBOX_AIRGAP_PLATFORM_REF is required.
+Resolve the upstream airgap-platform channel at workflow/build start and pass
+the resulting digest-pinned ref in the environment."
+REF="${OURBOX_AIRGAP_PLATFORM_REF}"
 
 OUT="${ROOT}/artifacts/airgap"
 PULL_DIR="${ROOT}/artifacts/.airgap-platform-pull"
@@ -114,10 +110,11 @@ if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
   if [[ "${OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS:-0}" == "1" ]] || [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
     die "AIRGAP_PLATFORM_REF '${REF}' is not digest-pinned.
   Official candidate/release builds require @sha256: refs to ensure reproducibility.
-  Update the approved upstream snapshot in sw-ourbox-os instead of editing release/official-inputs.env by hand."
+  Resolve the upstream channel before calling fetch-airgap-platform.sh and pass
+  the pinned ref via OURBOX_AIRGAP_PLATFORM_REF."
   elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
     log "WARNING: AIRGAP_PLATFORM_REF is not digest-pinned — nightly build will not be reproducible"
-    log "  Update the approved upstream snapshot in sw-ourbox-os once the next release is approved"
+    log "  Resolve the upstream channel before calling fetch-airgap-platform.sh"
   fi
 fi
 
