@@ -1,3 +1,10 @@
+## [0.14.2](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.1...v0.14.2) (2026-03-20)
+
+
+### Bug Fixes
+
+* align matchbox smoke with installer rootfs ([58c23ac](https://github.com/techofourown/img-ourbox-matchbox/commit/58c23ac12116bc0b9617689361d632963cc04ecf))
+
 ## [0.14.1](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.0...v0.14.1) (2026-03-20)
 
 
