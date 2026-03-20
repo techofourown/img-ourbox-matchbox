@@ -6,10 +6,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/tools/lib.sh"
 
 need_cmd xz
-need_cmd sfdisk
-need_cmd dd
-need_cmd debugfs
-need_cmd python3
+need_cmd losetup
+need_cmd lsblk
+need_cmd mount
+need_cmd umount
+need_cmd mountpoint
+need_cmd awk
 
 DEPLOY_DIR="${DEPLOY_DIR:-${ROOT}/deploy}"
 : "${OURBOX_TARGET:=rpi}"
@@ -21,57 +23,101 @@ if [[ -z "${IMG_XZ}" ]]; then
 fi
 [[ -n "${IMG_XZ}" && -f "${IMG_XZ}" ]] || die "installer image not found"
 
+SUDO=""
+if [[ ${EUID} -ne 0 ]]; then
+  command -v sudo >/dev/null 2>&1 || die "sudo required to inspect installer image partitions"
+  SUDO="sudo"
+fi
+
+run_root() {
+  if [[ -n "${SUDO}" ]]; then
+    sudo "$@"
+  else
+    "$@"
+  fi
+}
+
 TMP="$(mktemp -d)"
+LOOPDEV=""
+MOUNT_DIR="${TMP}/mnt"
 RAW_IMG="${TMP}/installer.img"
-PART_IMG="${TMP}/installer-root.ext4"
 EXTRACTED_DEFAULTS="${TMP}/installer-runtime.env"
+ROOT_PART=""
 
 cleanup() {
+  if mountpoint -q "${MOUNT_DIR}" 2>/dev/null; then
+    run_root umount "${MOUNT_DIR}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${LOOPDEV}" ]]; then
+    run_root losetup -d "${LOOPDEV}" >/dev/null 2>&1 || true
+  fi
   rm -rf "${TMP}"
 }
 trap cleanup EXIT
 
+mkdir -p "${MOUNT_DIR}"
+
 log "Extracting raw installer image from $(basename "${IMG_XZ}")"
 xz -dc "${IMG_XZ}" > "${RAW_IMG}"
 
-log "Parsing partition table"
-PART_INFO="$(python3 - "${RAW_IMG}" <<'PYEOF'
-import json, subprocess, sys
-out = subprocess.check_output(["sfdisk", "-J", sys.argv[1]], text=True)
-pt = json.loads(out)["partitiontable"]
-for p in pt["partitions"]:
-    # MBR type 83 = Linux; GPT Linux data partition GUID
-    if p.get("type", "").lower() in ("83", "0fc63daf-8483-4772-8e79-3d69d8477de4"):
-        print(p["start"], p["size"])
-        break
-PYEOF
-)" || die "failed to parse partition table from installer image"
+log "Attaching loop device for installer image"
+LOOPDEV="$(run_root losetup --find --show -Pf "${RAW_IMG}")"
 
-[[ -n "${PART_INFO}" ]] || die "no Linux partition found in installer image"
-read -r PART_START PART_SIZE <<< "${PART_INFO}"
+wait_for_loop_parts() {
+  local deadline=$((SECONDS + 10))
+  local parts=()
 
-log "Extracting root partition (start=${PART_START}, size=${PART_SIZE} sectors)"
-dd if="${RAW_IMG}" bs=512 skip="${PART_START}" count="${PART_SIZE}" of="${PART_IMG}" status=none
+  while (( SECONDS < deadline )); do
+    mapfile -t parts < <(run_root lsblk -rno PATH,TYPE "${LOOPDEV}" | awk '$2=="part" {print $1}')
+    if (( ${#parts[@]} > 0 )); then
+      printf '%s\n' "${parts[@]}"
+      return 0
+    fi
+    sleep 1
+  done
+
+  return 1
+}
+
+find_root_partition() {
+  local part=""
+
+  while read -r part; do
+    [[ -n "${part}" ]] || continue
+    if run_root mount -o ro "${part}" "${MOUNT_DIR}" >/dev/null 2>&1; then
+      if [[ -f "${MOUNT_DIR}/opt/ourbox/tools/ourbox-install" ]]; then
+        printf '%s\n' "${part}"
+        return 0
+      fi
+      run_root umount "${MOUNT_DIR}" >/dev/null 2>&1 || true
+    fi
+  done
+
+  return 1
+}
+
+mapfile -t loop_parts < <(wait_for_loop_parts)
+(( ${#loop_parts[@]} > 0 )) || die "no loop partitions found in installer image"
+
+ROOT_PART="$(printf '%s\n' "${loop_parts[@]}" | find_root_partition || true)"
+[[ -n "${ROOT_PART}" ]] || die "failed to locate the Matchbox installer root partition in ${IMG_XZ}"
 
 log "Reading installer defaults"
-debugfs -R "cat /opt/ourbox/installer/defaults.env" "${PART_IMG}" > "${EXTRACTED_DEFAULTS}" 2>/dev/null
+[[ -f "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" ]] \
+  || die "installer rootfs missing /opt/ourbox/installer/defaults.env"
+run_root cat "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" > "${EXTRACTED_DEFAULTS}"
 [[ -s "${EXTRACTED_DEFAULTS}" ]] \
   || die "failed to extract /opt/ourbox/installer/defaults.env from built installer image"
-
-debugfs_has() {
-  local path="$1"
-  debugfs -R "stat ${path}" "${PART_IMG}" 2>&1 | grep -q "^Inode:"
-}
 
 HAS_INSTALLER=0
 HAS_MISSION_DIR=0
 HAS_SSH_HELPER=0
 HAS_SELECTION_RESOLVER=0
 
-debugfs_has "/opt/ourbox/tools/ourbox-install"                  && HAS_INSTALLER=1
-debugfs_has "/opt/ourbox/tools/installer-ssh-helper.sh"         && HAS_SSH_HELPER=1
-debugfs_has "/opt/ourbox/mission"                               && HAS_MISSION_DIR=1
-debugfs_has "/opt/ourbox/tools/installer-selection-resolver.sh" && HAS_SELECTION_RESOLVER=1
+[[ -f "${MOUNT_DIR}/opt/ourbox/tools/ourbox-install" ]]                  && HAS_INSTALLER=1
+[[ -f "${MOUNT_DIR}/opt/ourbox/tools/installer-ssh-helper.sh" ]]         && HAS_SSH_HELPER=1
+[[ -d "${MOUNT_DIR}/opt/ourbox/mission" ]]                               && HAS_MISSION_DIR=1
+[[ -f "${MOUNT_DIR}/opt/ourbox/tools/installer-selection-resolver.sh" ]] && HAS_SELECTION_RESOLVER=1
 
 required_key() {
   local key="$1"
