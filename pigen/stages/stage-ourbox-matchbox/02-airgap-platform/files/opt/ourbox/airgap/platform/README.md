@@ -1,9 +1,13 @@
 # Platform contract (generated)
 
-This directory is populated at build time from the pinned platform contract OCI artifact.
+This directory is populated at build time from the resolved platform contract
+OCI artifact selected by the official workflow.
 
 Source of truth:
-- release/official-inputs.env (pinned platform-contract digest)
+- `sw-ourbox-os/release/approved-upstream-inputs.json` (authoritative approved
+  input intent)
+- generated build-time resolution records such as the current transitional
+  `release/official-inputs.env`
 - techofourown/sw-ourbox-os (platform-contract publisher)
 
 This synced tree now includes:

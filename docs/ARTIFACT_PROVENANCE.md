@@ -22,7 +22,7 @@ Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
 
 | Channel tag(s) | Artifact | Trigger |
 |---|---|---|
-| `rpi-beta` / `rpi-installer-beta` | OS image / Installer | Push to `main` using pinned `release/official-inputs.env` (heavy build) |
+| `rpi-beta` / `rpi-installer-beta` | OS image / Installer | Push to `main` using approved upstream input intent resolved at workflow start (currently materialized by transitional `release/official-inputs.env`) (heavy build) |
 | `rpi-stable` / `rpi-installer-stable` | OS image / Installer | Promotion after both candidate completion and matching GitHub Release `published` authorization are true; whichever arrives second wakes the retag (no rebuild) |
 | `rpi-nightly` / `rpi-installer-nightly` | OS image / Installer | Scheduled integration build using floating upstream `edge` refs (heavy build) |
 | `rpi-exp-labs` / `rpi-installer-exp-labs` | OS image / Installer | Promotion after both candidate completion and matching GitHub Release `prereleased` authorization are true; whichever arrives second wakes the retag (no rebuild) |
@@ -161,25 +161,28 @@ workflow provenance record for the retag operation.
 
 ---
 
-## Upstream input pinning
+## Upstream input resolution
 
-The official candidate build consumes pinned OCI artifacts from `sw-ourbox-os` (defined in
-`release/official-inputs.env`):
+The official candidate build still consumes exact OCI artifact identities from
+`sw-ourbox-os`, but the authoritative approval surface is the upstream approved
+snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`, not a
+repo-local checked-in copy of those digests.
+
+Current transitional materialization:
 
 ```
 PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:<digest>
 AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:<digest>
 ```
 
-These MUST be digest-pinned refs (never floating tags).
+`release/official-inputs.env` currently materializes that approved snapshot for
+compatibility with the existing candidate workflow. It is a transitional
+generated surface, MUST NOT be hand-edited as policy, and MUST NOT be treated
+as the normative official model for TOOO-to-TOOO upstream approval.
 
-The scheduled nightly integration build intentionally overrides those pins at workflow time by
-resolving the latest upstream `edge` digests before building.
-
-`release/official-inputs.env` is now a generated downstream lockfile. The approval point lives in
-`sw-ourbox-os/release/approved-upstream-inputs.json`, and the Matchbox lockfile is refreshed from
-that approved snapshot rather than hand-edited here. The next candidate build therefore stays
-digest-pinned while tracking a single upstream approval record instead of a repo-local copy.
+The scheduled nightly integration build intentionally overrides the approved
+snapshot at workflow time by resolving the latest upstream `edge` digests
+before building.
 
 ---
 
@@ -187,9 +190,11 @@ digest-pinned while tracking a single upstream approval record instead of a repo
 
 **No cryptographic signatures or attestations are currently used.**
 
-Provenance is established via OCI annotations, digest-pinned upstream refs, and the
-`os.meta.env`/`installer.meta.env` files accompanying each artifact. Users should consume
-artifacts by digest to ensure they receive exactly what was published.
+Provenance is established via OCI annotations, generated candidate / publish
+records, the exact upstream refs used by the workflow, and the
+`os.meta.env`/`installer.meta.env` files accompanying each artifact. Users
+should consume artifacts by digest to ensure they receive exactly what was
+published.
 
 When signatures or attestations are adopted, they will be documented here and the claim will
 only be made for artifacts that actually carry them, per policy rule 8.
@@ -212,4 +217,4 @@ TOOO-controlled publication are not official TOOO artifacts.
 - [ADR-0004: Consume Platform Contract from sw-ourbox-os](./decisions/ADR-0004-consume-platform-contract-from-sw-ourbox-os.md)
 - [OPS.md — Operator Runbook](./OPS.md)
 - `release/official-artifacts.env` — official publication targets
-- `release/official-inputs.env` — generated digest-pinned upstream lockfile
+- `release/official-inputs.env` — transitional generated materialization of the approved upstream snapshot

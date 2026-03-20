@@ -12,7 +12,7 @@ This is the only step-by-step doc. If reality and this file disagree, update thi
 
 - Container runtime: **Podman (rootful)**
 - Build tooling: **BuildKit installed on host**
-- Platform pins: **approved in `sw-ourbox-os/release/approved-upstream-inputs.json`** and consumed via the generated `release/official-inputs.env` lockfile for official builds
+- Platform inputs: **approved in `sw-ourbox-os/release/approved-upstream-inputs.json`** and currently materialized via transitional generated `release/official-inputs.env` for the official candidate build
 - Host tooling pins: **pinned** in `tools/versions.env` (BuildKit/ORAS)
 - Disk safety: **exactly two NVMe disks required**
   - DATA: whichever NVMe disk this install assigns the ext4 label `OURBOX_DATA`
