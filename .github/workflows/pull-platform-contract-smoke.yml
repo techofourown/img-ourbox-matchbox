@@ -21,7 +21,16 @@ jobs:
       - name: Pull platform contract by digest
         run: |
           set -euo pipefail
-          REF="$(cat contracts/platform-contract.ref)"
+          source ./tools/approved-upstream-inputs.upstream.env
+          REF="$(
+            python3 ./tools/release-control/release_control.py resolve-approved-upstream-input \
+              --github-repo "${SW_OURBOX_OS_APPROVED_INPUTS_REPO}" \
+              --github-ref "${SW_OURBOX_OS_APPROVED_INPUTS_REVISION}" \
+              --github-path "${SW_OURBOX_OS_APPROVED_INPUTS_PATH}" \
+              --artifact-key platform_contract \
+              --channel-key candidate \
+              --env-var REF
+          )"
           rm -rf /tmp/platform-contract
           mkdir -p /tmp/platform-contract
           oras pull "${REF}" -o /tmp/platform-contract
