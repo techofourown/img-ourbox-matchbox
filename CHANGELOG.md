@@ -1,3 +1,16 @@
+# [0.14.0](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.8...v0.14.0) (2026-03-20)
+
+
+### Bug Fixes
+
+* address snapshot workflow lint regressions ([2544766](https://github.com/techofourown/img-ourbox-matchbox/commit/2544766ca7ffc3a801b8ae6a9c6b25657de3a762))
+* couple Matchbox upstream input selection ([00ee591](https://github.com/techofourown/img-ourbox-matchbox/commit/00ee59146ac9c15d27caead79794e584f5671b9c))
+
+
+### Features
+
+* consume approved upstream input snapshots ([5c749ba](https://github.com/techofourown/img-ourbox-matchbox/commit/5c749badb5c2c06bacc145d7f829f5e3bb502ac3))
+
 ## [0.13.8](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.13.7...v0.13.8) (2026-03-18)
 
 
