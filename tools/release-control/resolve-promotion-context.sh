@@ -15,6 +15,60 @@ write_output() {
   printf '%s=%s\n' "$1" "$2" >> "${GITHUB_OUTPUT_PATH}"
 }
 
+resolve_release_candidate_run() {
+  local source_commit="$1"
+  local release_tag="$2"
+  local timeout_seconds="${CANDIDATE_LOOKUP_TIMEOUT_SECONDS:-90}"
+  local poll_seconds="${CANDIDATE_LOOKUP_POLL_SECONDS:-5}"
+  local start_time now elapsed status candidate_run_id
+  local no_run_timeout_exit=6
+
+  start_time="$(date +%s)"
+  while true; do
+    set +e
+    candidate_run_id="$("${ROOT}/tools/release-control/find-successful-candidate-run.sh" "${CANDIDATE_WORKFLOW_NAME}" "${source_commit}")"
+    status=$?
+    set -e
+
+    if [[ "${status}" -eq 0 ]]; then
+      printf '%s\n' "${candidate_run_id}"
+      return 0
+    fi
+
+    case "${status}" in
+      4)
+        printf '[%s] %s\n' \
+          "$(date -Is)" \
+          "Matching ${CANDIDATE_WORKFLOW_NAME} candidate run is still in progress for release ${release_tag} (${source_commit}); deferring promotion to the workflow_run handoff" >&2
+        return 4
+        ;;
+      5)
+        printf '[%s] ERROR: %s\n' \
+          "$(date -Is)" \
+          "No successful ${CANDIDATE_WORKFLOW_NAME} candidate run found for release ${release_tag} (${source_commit}); matching candidate runs completed unsuccessfully" >&2
+        return 5
+        ;;
+      3)
+        now="$(date +%s)"
+        elapsed=$(( now - start_time ))
+        if (( elapsed >= timeout_seconds )); then
+          printf '[%s] ERROR: %s\n' \
+            "$(date -Is)" \
+            "No ${CANDIDATE_WORKFLOW_NAME} candidate run found for release ${release_tag} (${source_commit}) within ${timeout_seconds}s; refusing silent promotion skip" >&2
+          return "${no_run_timeout_exit}"
+        fi
+        printf '[%s] %s\n' \
+          "$(date -Is)" \
+          "No ${CANDIDATE_WORKFLOW_NAME} candidate run found yet for release ${release_tag} (${source_commit}); waiting ${poll_seconds}s for candidate workflow registration" >&2
+        sleep "${poll_seconds}"
+        ;;
+      *)
+        return "${status}"
+        ;;
+    esac
+  done
+}
+
 resolve_source_commit() {
   local release_ref="$1"
   local commit subject
@@ -79,19 +133,22 @@ elif [[ "${GITHUB_EVENT_NAME:-}" == "release" ]]; then
   fi
 
   source_commit="$(resolve_source_commit "refs/tags/${release_tag}")"
-  if candidate_run_id="$("${ROOT}/tools/release-control/find-successful-candidate-run.sh" "${CANDIDATE_WORKFLOW_NAME}" "${source_commit}")"; then
+  set +e
+  candidate_run_id="$(resolve_release_candidate_run "${source_commit}" "${release_tag}")"
+  status=$?
+  set -e
+  if [[ "${status}" -eq 0 ]]; then
     :
-  else
-    status=$?
-    if [[ "${status}" -eq 3 ]]; then
-      write_output skip true
-      write_output source_commit "${source_commit}"
-      write_output candidate_run_id ""
-      write_output release_tag "${release_tag}"
-      exit 0
-    fi
+  elif [[ "${status}" -eq 4 ]]; then
+    write_output skip true
+    write_output source_commit "${source_commit}"
+    write_output candidate_run_id ""
+    write_output release_tag "${release_tag}"
+    exit 0
+  elif [[ "${status}" -eq 5 || "${status}" -eq 6 ]]; then
     exit "${status}"
   fi
+  exit "${status}"
 else
   die "Unsupported GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME:-}"
 fi
