@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/tools/lib.sh"
+# shellcheck disable=SC1091
+source "${ROOT}/tools/installer-substrate-smoke-lib.sh"
+
+report_err() {
+  local rc=$?
+  log "ERROR: command failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${rc})"
+  exit "${rc}"
+}
+trap report_err ERR
 
 need_cmd xz
 need_cmd losetup
@@ -110,7 +119,8 @@ run_root mount -o ro "${ROOT_PART}" "${MOUNT_DIR}" >/dev/null 2>&1 \
 log "Reading installer defaults"
 run_root test -f "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" \
   || die "installer rootfs missing /opt/ourbox/installer/defaults.env"
-run_root cat "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" > "${EXTRACTED_DEFAULTS}"
+run_root cat "${MOUNT_DIR}/opt/ourbox/installer/defaults.env" > "${EXTRACTED_DEFAULTS}" \
+  || die "failed to extract /opt/ourbox/installer/defaults.env from built installer image"
 [[ -s "${EXTRACTED_DEFAULTS}" ]] \
   || die "failed to extract /opt/ourbox/installer/defaults.env from built installer image"
 
@@ -126,12 +136,12 @@ run_root test -f "${MOUNT_DIR}/opt/ourbox/tools/installer-selection-resolver.sh"
 
 required_key() {
   local key="$1"
-  grep -Eq "^${key}=" "${EXTRACTED_DEFAULTS}" || die "installer runtime defaults missing ${key}"
+  required_key_in_file "${EXTRACTED_DEFAULTS}" "${key}"
 }
 
 forbidden_key() {
   local key="$1"
-  grep -Eq "^${key}=" "${EXTRACTED_DEFAULTS}" && die "installer runtime defaults must not define ${key}"
+  forbidden_key_in_file "${EXTRACTED_DEFAULTS}" "${key}"
 }
 
 required_key "INSTALLER_ID"
@@ -140,7 +150,8 @@ required_key "INSTALLER_GIT_HASH"
 required_key "OURBOX_INSTALLER_SSH_TEARDOWN_ON_COMPLETE"
 
 # shellcheck disable=SC1090
-source "${EXTRACTED_DEFAULTS}"
+source "${EXTRACTED_DEFAULTS}" \
+  || die "failed to source extracted installer defaults"
 
 [[ "${INSTALLER_ID:-}" == "matchbox" ]] \
   || die "installer runtime INSTALLER_ID mismatch: expected 'matchbox', found '${INSTALLER_ID:-}'"
@@ -167,7 +178,8 @@ forbidden_key "AIRGAP_PLATFORM_CATALOG_TAG"
 [[ "${HAS_SELECTION_RESOLVER}" == "0" ]] \
   || die "installer substrate must not ship /opt/ourbox/tools/installer-selection-resolver.sh"
 
-cp "${EXTRACTED_DEFAULTS}" "${DEPLOY_DIR}/installer-runtime.extracted.env"
+cp "${EXTRACTED_DEFAULTS}" "${DEPLOY_DIR}/installer-runtime.extracted.env" \
+  || die "failed to persist extracted installer defaults into deploy/"
 cat > "${DEPLOY_DIR}/installer-substrate-smoke.txt" <<EOF
 ARTIFACT=$(basename "${IMG_XZ}")
 EXTRACTED_DEFAULTS=${DEPLOY_DIR}/installer-runtime.extracted.env
