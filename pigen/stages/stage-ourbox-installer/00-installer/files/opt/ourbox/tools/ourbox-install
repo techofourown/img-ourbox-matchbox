@@ -1,45 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shellcheck disable=SC1091
-source /opt/ourbox/tools/lib.sh
+OURBOX_INSTALL_LIBRARY_ONLY="${OURBOX_INSTALL_LIBRARY_ONLY:-0}"
+INSTALLER_LOG="${OURBOX_INSTALLER_LOG:-/run/ourbox-installer.log}"
 
-INSTALLER_LOG="/run/ourbox-installer.log"
-if command -v tee >/dev/null 2>&1; then
+TOOLS_ROOT="${OURBOX_INSTALL_TOOLS_ROOT:-/opt/ourbox/tools}"
+# shellcheck disable=SC1091
+source "${TOOLS_ROOT}/lib.sh"
+
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]] && command -v tee >/dev/null 2>&1; then
   exec > >(tee -a "${INSTALLER_LOG}") 2>&1
 fi
 
-need_cmd xz
-need_cmd xzcat
-need_cmd sha256sum
-need_cmd dd
-need_cmd lsblk
-need_cmd readlink
-need_cmd findmnt
-need_cmd blkid
-need_cmd partprobe
-need_cmd wipefs
-need_cmd blockdev
-need_cmd parted
-need_cmd mkfs.ext4
-need_cmd mount
-need_cmd umount
-need_cmd mountpoint
+need_cmd awk
+need_cmd cmp
 need_cmd find
-need_cmd openssl
-need_cmd sync
-need_cmd tar
-need_cmd ip
-need_cmd sort
-need_cmd udevadm
 need_cmd python3
+need_cmd sha256sum
+need_cmd tar
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]]; then
+  need_cmd xz
+  need_cmd xzcat
+  need_cmd dd
+  need_cmd lsblk
+  need_cmd readlink
+  need_cmd findmnt
+  need_cmd blkid
+  need_cmd partprobe
+  need_cmd wipefs
+  need_cmd blockdev
+  need_cmd parted
+  need_cmd mkfs.ext4
+  need_cmd mount
+  need_cmd umount
+  need_cmd mountpoint
+  need_cmd openssl
+  need_cmd sync
+  need_cmd ip
+  need_cmd sort
+  need_cmd udevadm
+fi
 
-DATA_CHECK_MP="/run/ourbox-installer/data-check"
-SYS_BOOT_MP="/run/ourbox-installer/sys-boot"
-SYS_ROOT_MP="/run/ourbox-installer/sys-root"
-MISSION_ROOT="/opt/ourbox/mission"
-AIRGAP_EXTRACT_DIR="/opt/ourbox/installer/cache/airgap-platform"
-DEFAULTS_ENV="/opt/ourbox/installer/defaults.env"
+DATA_CHECK_MP="${OURBOX_INSTALL_DATA_CHECK_MP:-/run/ourbox-installer/data-check}"
+SYS_BOOT_MP="${OURBOX_INSTALL_SYS_BOOT_MP:-/run/ourbox-installer/sys-boot}"
+SYS_ROOT_MP="${OURBOX_INSTALL_SYS_ROOT_MP:-/run/ourbox-installer/sys-root}"
+MISSION_ROOT="${OURBOX_INSTALL_MISSION_ROOT:-/opt/ourbox/mission}"
+AIRGAP_EXTRACT_DIR="${OURBOX_INSTALL_AIRGAP_EXTRACT_DIR:-/opt/ourbox/installer/cache/airgap-platform}"
+DEFAULTS_ENV="${OURBOX_INSTALL_DEFAULTS_ENV:-/opt/ourbox/installer/defaults.env}"
 
 INSTALLER_ID=""
 INSTALLER_VERSION=""
@@ -77,7 +84,7 @@ IDENTITY_PASSWORD_HASH=""
 MATCHBOX_DATA_CHECK_MP="${DATA_CHECK_MP}"
 
 # shellcheck disable=SC1091
-source /opt/ourbox/tools/matchbox-storage-flow.sh
+source "${TOOLS_ROOT}/matchbox-storage-flow.sh"
 
 cleanup_mounts() {
   matchbox_cleanup_data_check_mp
@@ -113,7 +120,9 @@ finalize() {
 
   exec /bin/bash -l
 }
-trap finalize EXIT
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]]; then
+  trap finalize EXIT
+fi
 
 confirm_exact_answer() {
   local expected="$1"
@@ -250,6 +259,35 @@ parse_sha256_file() {
   awk 'NF>=1 {print $1; exit}' "${file}"
 }
 
+resolve_path_within_root() {
+  local root="$1"
+  local label="$2"
+  local relpath="$3"
+
+  python3 - <<'PY' "${root}" "${label}" "${relpath}"
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).resolve()
+label = sys.argv[2]
+relpath = sys.argv[3].strip()
+if not relpath:
+    raise SystemExit(f"{label} must be set")
+
+candidate = (root / relpath).resolve()
+try:
+    candidate.relative_to(root)
+except ValueError as exc:
+    raise SystemExit(f"{label} must stay within the mission directory") from exc
+
+print(candidate)
+PY
+}
+
+resolve_mission_relpath() {
+  resolve_path_within_root "${MISSION_ROOT}" "$1" "$2"
+}
+
 normalize_installer_config() {
   INSTALLER_ID="${INSTALLER_ID:-matchbox}"
   INSTALLER_VERSION="${INSTALLER_VERSION:-unknown}"
@@ -276,14 +314,20 @@ import sys
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
     manifest = json.load(handle)
 
-if manifest.get("schema") != 1 or manifest.get("kind") != "ourbox-mission":
-    raise SystemExit("mission-manifest.json must declare schema=1 and kind=ourbox-mission")
+if manifest.get("kind") != "ourbox-mission":
+    raise SystemExit("mission-manifest.json must declare kind=ourbox-mission")
 target = manifest.get("target") or {}
 if target.get("id") != "matchbox":
     raise SystemExit("mission target id must be matchbox")
+requested = manifest.get("requested")
+if not isinstance(requested, dict) or not requested:
+    raise SystemExit("mission-manifest.json must include a requested object")
+resolved = manifest.get("resolved")
+if not isinstance(resolved, dict) or not resolved:
+    raise SystemExit("mission-manifest.json must include a resolved object")
 
-selected_os = manifest.get("selected_os") or {}
-selected_airgap = manifest.get("selected_airgap") or {}
+selected_os = resolved.get("os") or {}
+selected_airgap = resolved.get("airgap") or {}
 platform_contract = manifest.get("platform_contract") or {}
 
 values = [
@@ -313,15 +357,16 @@ PY
   RELEASE_CHANNEL="${mission_fields[1]}"
   OS_ARTIFACT_REF="${mission_fields[2]}"
   OS_ARTIFACT_DIGEST="${mission_fields[3]}"
-  PAYLOAD_PATH="${MISSION_ROOT}/${mission_fields[4]}"
-  PAYLOAD_META="${MISSION_ROOT}/${mission_fields[5]}"
+  PAYLOAD_PATH="$(resolve_mission_relpath "mission OS payload relpath" "${mission_fields[4]}")"
+  PAYLOAD_META="$(resolve_mission_relpath "mission OS metadata relpath" "${mission_fields[5]}")"
   PLATFORM_CONTRACT_DIGEST="${mission_fields[6]}"
   OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="${mission_fields[7]}"
   OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${mission_fields[8]}"
   OURBOX_AIRGAP_PLATFORM_REF="${mission_fields[9]}"
   OURBOX_AIRGAP_PLATFORM_DIGEST="${mission_fields[10]}"
-  local airgap_payload="${MISSION_ROOT}/${mission_fields[11]}"
-  AIRGAP_MANIFEST_PATH="${MISSION_ROOT}/${mission_fields[12]}"
+  local airgap_payload=""
+  airgap_payload="$(resolve_mission_relpath "mission application bundle relpath" "${mission_fields[11]}")"
+  AIRGAP_MANIFEST_PATH="$(resolve_mission_relpath "mission application bundle manifest relpath" "${mission_fields[12]}")"
 
   [[ -f "${PAYLOAD_PATH}" ]] || die "mission OS payload missing: ${PAYLOAD_PATH}"
   [[ -f "${PAYLOAD_META}" ]] || die "mission OS metadata missing: ${PAYLOAD_META}"
@@ -584,4 +629,6 @@ main() {
   show_completion_summary
 }
 
-main "$@"
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]]; then
+  main "$@"
+fi
