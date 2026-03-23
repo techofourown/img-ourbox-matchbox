@@ -112,6 +112,7 @@ run_loader() {
   local mission_root="$1"
   local airgap_extract_dir="$2"
 
+  # shellcheck disable=SC2016
   env \
     OURBOX_INSTALL_LIBRARY_ONLY=1 \
     OURBOX_INSTALL_TOOLS_ROOT="${TOOLS_DIR}" \
