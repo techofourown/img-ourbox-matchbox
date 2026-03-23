@@ -167,6 +167,16 @@ grep -Fq "AIRGAP_MANIFEST_PATH=${MISSION_ROOT}/artifacts/airgap/manifest.env" <<
 [[ -x "${AIRGAP_EXTRACT_DIR}/k3s/k3s" ]] \
   || die "matchbox runtime did not extract the application bundle runtime"
 
+set +e
+library_exec_output="$(OURBOX_INSTALL_LIBRARY_ONLY=1 bash "${INSTALLER_SCRIPT}" 2>&1)"
+library_exec_status=$?
+set -e
+
+[[ "${library_exec_status}" -ne 0 ]] \
+  || die "matchbox installer executed successfully in library-only mode instead of failing fast"
+grep -Fq "OURBOX_INSTALL_LIBRARY_ONLY=1 is supported only when sourcing" <<<"${library_exec_output}" \
+  || die "matchbox installer did not explain the bad library-only invocation"
+
 BAD_MISSION_ROOT="${TMP}/bad-mission"
 cp -a "${MISSION_ROOT}" "${BAD_MISSION_ROOT}"
 python3 - <<'PY' "${BAD_MISSION_ROOT}/mission-manifest.json"

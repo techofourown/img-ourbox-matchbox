@@ -3,6 +3,15 @@ set -euo pipefail
 
 OURBOX_INSTALL_LIBRARY_ONLY="${OURBOX_INSTALL_LIBRARY_ONLY:-0}"
 INSTALLER_LOG="${OURBOX_INSTALLER_LOG:-/run/ourbox-installer.log}"
+OURBOX_INSTALL_IS_SOURCED=0
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  OURBOX_INSTALL_IS_SOURCED=1
+fi
+
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" == "1" && "${OURBOX_INSTALL_IS_SOURCED}" != "1" ]]; then
+  printf 'ERROR: OURBOX_INSTALL_LIBRARY_ONLY=1 is supported only when sourcing %s\n' "${BASH_SOURCE[0]}" >&2
+  exit 1
+fi
 
 TOOLS_ROOT="${OURBOX_INSTALL_TOOLS_ROOT:-/opt/ourbox/tools}"
 # shellcheck disable=SC1091
