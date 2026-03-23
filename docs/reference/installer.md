@@ -36,7 +36,7 @@ There is no runtime boot-media override for payload selection.
 - Installer logs its operator-visible flow to `/run/ourbox-installer.log` in addition to `tty1`,
   so support media can inspect the same transcript over SSH.
 - Installer validates the embedded mission locally before any destructive work:
-  - mission manifest schema and target id
+  - mission manifest contract shape and target id
   - staged OS payload bytes and checksum
   - staged OS metadata contract digest
   - staged application-bundle tarball shape

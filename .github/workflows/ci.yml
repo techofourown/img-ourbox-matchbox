@@ -90,6 +90,16 @@ jobs:
       - name: Run installer substrate smoke helper regression
         run: bash tools/check-installer-substrate-smoke-helper-smoke.sh
 
+  local-mission-runtime:
+    name: Matchbox local mission runtime smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Matchbox local mission runtime smoke
+        run: bash tools/check-local-mission-runtime-smoke.sh
+
   platform-contract-shape:
     name: Platform contract shape smoke
     runs-on: ubuntu-latest

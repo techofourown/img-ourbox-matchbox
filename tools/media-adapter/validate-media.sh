@@ -301,8 +301,14 @@ def validate_airgap_bundle(payload_path: pathlib.Path, manifest_path: pathlib.Pa
         raise SystemExit(f"mission selected_airgap.payload_relpath is not a valid gzip tarball: {exc}") from exc
 
 
-if manifest.get("schema") != 1 or manifest.get("kind") != "ourbox-mission":
-    raise SystemExit("mission-manifest.json must declare schema=1 and kind=ourbox-mission")
+if manifest.get("kind") != "ourbox-mission":
+    raise SystemExit("mission-manifest.json must declare kind=ourbox-mission")
+requested = manifest.get("requested")
+if not isinstance(requested, dict) or not requested:
+    raise SystemExit("mission requested must be present")
+resolved = manifest.get("resolved")
+if not isinstance(resolved, dict) or not resolved:
+    raise SystemExit("mission resolved must be present")
 
 target = manifest.get("target") or {}
 if target.get("id") != adapter["target_id"]:
@@ -318,7 +324,7 @@ mission_media = manifest.get("mission_media") or {}
 if mission_media.get("compose_strategy") != "matchbox-fat-image-with-host-selected-os-and-airgap":
     raise SystemExit("mission compose strategy must be matchbox-fat-image-with-host-selected-os-and-airgap")
 
-substrate = manifest.get("substrate") or {}
+substrate = resolved.get("substrate") or {}
 if substrate.get("strategy") != "published-installer-substrate":
     raise SystemExit("mission substrate.strategy must be published-installer-substrate")
 if substrate.get("compose_entrypoint") != "tools/media-adapter/compose-media.sh":
@@ -336,7 +342,7 @@ platform_contract_digest = str(platform_contract.get("digest", "")).strip()
 if not sha256_re.fullmatch(platform_contract_digest):
     raise SystemExit("mission platform_contract.digest must be sha256:...")
 
-selected_os = manifest.get("selected_os") or {}
+selected_os = resolved.get("os") or {}
 os_artifact_ref = str(selected_os.get("artifact_ref", "")).strip()
 os_artifact_digest = str(selected_os.get("artifact_digest", "")).strip()
 os_artifact_type = str(selected_os.get("artifact_type", "")).strip()
@@ -457,7 +463,7 @@ if os_meta_fields[0] != expected_type:
 if os_meta_fields[1] != platform_contract_digest:
     raise SystemExit("selected_os.metadata_relpath OURBOX_PLATFORM_CONTRACT_DIGEST does not match platform_contract.digest")
 
-selected_airgap = manifest.get("selected_airgap") or {}
+selected_airgap = resolved.get("airgap") or {}
 airgap_artifact_ref = str(selected_airgap.get("artifact_ref", "")).strip()
 airgap_artifact_digest = str(selected_airgap.get("artifact_digest", "")).strip()
 airgap_substrate_contract = str(selected_airgap.get("platform_contract_digest", "")).strip()
@@ -479,7 +485,7 @@ staged_airgap_manifest = require_staged_file("selected_airgap.manifest_relpath",
 validate_sha256_sidecar("selected_airgap.payload_relpath", airgap_payload_relpath, staged_airgap_payload)
 validate_airgap_bundle(staged_airgap_payload, staged_airgap_manifest, platform_contract_digest)
 
-installed_target_ssh = manifest.get("installed_target_ssh")
+installed_target_ssh = resolved.get("installed_target_ssh")
 if installed_target_ssh is not None:
     mode = str(installed_target_ssh.get("mode", "")).strip()
     if mode != "host-generated-authorized-key":
