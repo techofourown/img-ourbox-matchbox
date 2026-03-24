@@ -1,3 +1,14 @@
+## [0.14.5](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.4...v0.14.5) (2026-03-24)
+
+
+### Bug Fixes
+
+* align with woodbox [#82](https://github.com/techofourown/img-ourbox-matchbox/issues/82)/[#85](https://github.com/techofourown/img-ourbox-matchbox/issues/85)/[#80](https://github.com/techofourown/img-ourbox-matchbox/issues/80) equivalents ([8e09675](https://github.com/techofourown/img-ourbox-matchbox/commit/8e0967559216934aa9b0f8baa5d9df072f01b698))
+* allow transitional SCHEMA/KIND keys in substrate validation ([eaa6db3](https://github.com/techofourown/img-ourbox-matchbox/commit/eaa6db32db871688bb83f92f55753d076ce9bda7)), closes [#140](https://github.com/techofourown/img-ourbox-matchbox/issues/140)
+* harden the local mission loader ([14ad68d](https://github.com/techofourown/img-ourbox-matchbox/commit/14ad68d7d549b204248ca89c017795efa170a14e))
+* reject bad matchbox library-only execution ([6044f65](https://github.com/techofourown/img-ourbox-matchbox/commit/6044f65dea85d4ec5881b08a94adc6d8303e9b0b))
+* silence shellcheck in the mission smoke ([1392fd3](https://github.com/techofourown/img-ourbox-matchbox/commit/1392fd3a79eeb7a37293331cc57d69d3dbb0afea))
+
 ## [0.14.4](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.3...v0.14.4) (2026-03-20)
 
 
