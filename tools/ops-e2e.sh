@@ -196,7 +196,7 @@ resolve_default_substrate_ref() {
       --github-repo "${SW_OURBOX_OS_APPROVED_INPUTS_REPO}" \
       --github-ref "${SW_OURBOX_OS_APPROVED_INPUTS_REVISION}" \
       --github-path "${SW_OURBOX_OS_APPROVED_INPUTS_PATH}" \
-      --artifact-key matchbox_airgap_platform \
+      --artifact-key matchbox_ourbox_substrate \
       --channel-key candidate
   )"
   export OURBOX_SUBSTRATE_REF
