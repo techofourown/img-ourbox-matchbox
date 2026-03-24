@@ -38,7 +38,7 @@ DATA_CHECK_MP="/run/ourbox-installer/data-check"
 SYS_BOOT_MP="/run/ourbox-installer/sys-boot"
 SYS_ROOT_MP="/run/ourbox-installer/sys-root"
 MISSION_ROOT="/opt/ourbox/mission"
-AIRGAP_EXTRACT_DIR="/opt/ourbox/installer/cache/airgap-platform"
+AIRGAP_EXTRACT_DIR="/opt/ourbox/installer/cache/ourbox-substrate"
 DEFAULTS_ENV="/opt/ourbox/installer/defaults.env"
 
 INSTALLER_ID=""
@@ -56,19 +56,19 @@ INSTALL_SELECTION_SOURCE=""
 RELEASE_CHANNEL=""
 PLATFORM_CONTRACT_DIGEST=""
 
-OURBOX_AIRGAP_PLATFORM_SOURCE=""
-OURBOX_AIRGAP_PLATFORM_REVISION=""
-OURBOX_AIRGAP_PLATFORM_VERSION=""
-OURBOX_AIRGAP_PLATFORM_CREATED=""
-OURBOX_AIRGAP_PLATFORM_ARCH=""
-OURBOX_AIRGAP_PLATFORM_PROFILE=""
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=""
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=""
-OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="mission"
-OURBOX_AIRGAP_PLATFORM_REF=""
-OURBOX_AIRGAP_PLATFORM_DIGEST=""
-OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=""
-OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=""
+OURBOX_SUBSTRATE_SOURCE=""
+OURBOX_SUBSTRATE_REVISION=""
+OURBOX_SUBSTRATE_VERSION=""
+OURBOX_SUBSTRATE_CREATED=""
+OURBOX_SUBSTRATE_ARCH=""
+OURBOX_SUBSTRATE_PROFILE=""
+OURBOX_SUBSTRATE_K3S_VERSION=""
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=""
+OURBOX_SUBSTRATE_ARTIFACT_SOURCE="mission"
+OURBOX_SUBSTRATE_REF=""
+OURBOX_SUBSTRATE_DIGEST=""
+OURBOX_SUBSTRATE_SELECTION_SOURCE=""
+OURBOX_SUBSTRATE_RELEASE_CHANNEL=""
 AIRGAP_MANIFEST_PATH=""
 
 IDENTITY_USERNAME="ourbox"
@@ -195,13 +195,13 @@ show_install_plan() {
   fi
   echo "  Digest      : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  Payload SHA : ${PAYLOAD_SHA256}"
-  echo "  Apps bundle : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Apps source : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Apps select : ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Apps lane   : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Apps bundle : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Apps source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Apps select : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Apps lane   : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Apps digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  echo "  Apps digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   if [[ "${MATCHBOX_SYSTEM_DISK_WAS_DATA}" == "1" ]]; then
@@ -222,13 +222,13 @@ show_completion_summary() {
   fi
   echo "  Digest      : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  Payload SHA : ${PAYLOAD_SHA256}"
-  echo "  Apps bundle : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Apps source : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Apps select : ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Apps lane   : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Apps bundle : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Apps source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Apps select : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Apps lane   : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Apps digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  echo "  Apps digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   echo
@@ -316,10 +316,10 @@ PY
   PAYLOAD_PATH="${MISSION_ROOT}/${mission_fields[4]}"
   PAYLOAD_META="${MISSION_ROOT}/${mission_fields[5]}"
   PLATFORM_CONTRACT_DIGEST="${mission_fields[6]}"
-  OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="${mission_fields[7]}"
-  OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${mission_fields[8]}"
-  OURBOX_AIRGAP_PLATFORM_REF="${mission_fields[9]}"
-  OURBOX_AIRGAP_PLATFORM_DIGEST="${mission_fields[10]}"
+  OURBOX_SUBSTRATE_SELECTION_SOURCE="${mission_fields[7]}"
+  OURBOX_SUBSTRATE_RELEASE_CHANNEL="${mission_fields[8]}"
+  OURBOX_SUBSTRATE_REF="${mission_fields[9]}"
+  OURBOX_SUBSTRATE_DIGEST="${mission_fields[10]}"
   local airgap_payload="${MISSION_ROOT}/${mission_fields[11]}"
   AIRGAP_MANIFEST_PATH="${MISSION_ROOT}/${mission_fields[12]}"
 
@@ -365,17 +365,17 @@ PY
   source "${AIRGAP_MANIFEST_PATH}"
   [[ "${OURBOX_PLATFORM_CONTRACT_DIGEST:-}" == "${PLATFORM_CONTRACT_DIGEST}" ]] \
     || die "mission application bundle contract digest mismatch"
-  [[ "${AIRGAP_PLATFORM_ARCH:-}" == "arm64" ]] \
-    || die "mission application bundle arch mismatch: expected arm64, got ${AIRGAP_PLATFORM_ARCH:-unknown}"
+  [[ "${OURBOX_SUBSTRATE_ARCH:-}" == "arm64" ]] \
+    || die "mission application bundle arch mismatch: expected arm64, got ${OURBOX_SUBSTRATE_ARCH:-unknown}"
 
-  OURBOX_AIRGAP_PLATFORM_SOURCE="${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_REVISION="${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_VERSION="${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_CREATED="${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_ARCH="${AIRGAP_PLATFORM_ARCH:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_PROFILE="${OURBOX_PLATFORM_PROFILE:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_K3S_VERSION="${K3S_VERSION:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${OURBOX_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
+  OURBOX_SUBSTRATE_SOURCE="${OURBOX_SUBSTRATE_SOURCE:-unknown}"
+  OURBOX_SUBSTRATE_REVISION="${OURBOX_SUBSTRATE_REVISION:-unknown}"
+  OURBOX_SUBSTRATE_VERSION="${OURBOX_SUBSTRATE_VERSION:-unknown}"
+  OURBOX_SUBSTRATE_CREATED="${OURBOX_SUBSTRATE_CREATED:-unknown}"
+  OURBOX_SUBSTRATE_ARCH="${OURBOX_SUBSTRATE_ARCH:-unknown}"
+  OURBOX_SUBSTRATE_PROFILE="${OURBOX_PLATFORM_PROFILE:-unknown}"
+  OURBOX_SUBSTRATE_K3S_VERSION="${K3S_VERSION:-unknown}"
+  OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="${OURBOX_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
 }
 
 show_payload_metadata() {
@@ -391,24 +391,24 @@ show_payload_metadata() {
   echo
 }
 
-show_airgap_platform_metadata() {
+show_ourbox_substrate_metadata() {
   echo
   echo "Application bundle:"
-  echo "  Selection source: ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Release channel : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Selection source: ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Release channel : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Artifact source : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Artifact ref    : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Artifact digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
-  echo "  Upstream source : ${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}"
-  echo "  Revision        : ${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}"
-  echo "  Version         : ${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}"
-  echo "  Created         : ${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}"
-  echo "  Arch            : ${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}"
-  echo "  Profile         : ${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}"
-  echo "  K3s version     : ${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}"
-  echo "  Images lock sha : ${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
+  echo "  Artifact source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Artifact ref    : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Artifact digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
+  echo "  Upstream source : ${OURBOX_SUBSTRATE_SOURCE:-unknown}"
+  echo "  Revision        : ${OURBOX_SUBSTRATE_REVISION:-unknown}"
+  echo "  Version         : ${OURBOX_SUBSTRATE_VERSION:-unknown}"
+  echo "  Created         : ${OURBOX_SUBSTRATE_CREATED:-unknown}"
+  echo "  Arch            : ${OURBOX_SUBSTRATE_ARCH:-unknown}"
+  echo "  Profile         : ${OURBOX_SUBSTRATE_PROFILE:-unknown}"
+  echo "  K3s version     : ${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}"
+  echo "  Images lock sha : ${OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256:-unknown}"
   echo
 }
 
@@ -422,7 +422,7 @@ teardown_installer_ssh() {
   log "Installer SSH service stopped for this session."
 }
 
-overlay_selected_airgap_platform_into_mounted_root() {
+overlay_selected_ourbox_substrate_into_mounted_root() {
   local target_airgap="${SYS_ROOT_MP}/opt/ourbox/airgap"
   local target_platform="${target_airgap}/platform"
 
@@ -448,7 +448,7 @@ write_install_provenance() {
   fi
 
   mount "${root_part}" "${SYS_ROOT_MP}"
-  overlay_selected_airgap_platform_into_mounted_root
+  overlay_selected_ourbox_substrate_into_mounted_root
   release_file="${SYS_ROOT_MP}/etc/ourbox/release"
   [[ -f "${release_file}" ]] || die "installed release metadata missing: ${release_file}"
 
@@ -464,19 +464,19 @@ OURBOX_INSTALL_DEFAULTS_SOURCE=none
 OURBOX_INSTALL_DEFAULTS_REF=
 OURBOX_INSTALL_SELECTION_SOURCE=${INSTALL_SELECTION_SOURCE:-unknown}
 OURBOX_RELEASE_CHANNEL=${RELEASE_CHANNEL:-}
-OURBOX_AIRGAP_PLATFORM_SOURCE=${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_REVISION=${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}
-OURBOX_AIRGAP_PLATFORM_VERSION=${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}
-OURBOX_AIRGAP_PLATFORM_CREATED=${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}
-OURBOX_AIRGAP_PLATFORM_ARCH=${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}
-OURBOX_AIRGAP_PLATFORM_PROFILE=${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}
-OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_REF=${OURBOX_AIRGAP_PLATFORM_REF:-unknown}
-OURBOX_AIRGAP_PLATFORM_DIGEST=${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}
-OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL:-}
+OURBOX_SUBSTRATE_SOURCE=${OURBOX_SUBSTRATE_SOURCE:-unknown}
+OURBOX_SUBSTRATE_REVISION=${OURBOX_SUBSTRATE_REVISION:-unknown}
+OURBOX_SUBSTRATE_VERSION=${OURBOX_SUBSTRATE_VERSION:-unknown}
+OURBOX_SUBSTRATE_CREATED=${OURBOX_SUBSTRATE_CREATED:-unknown}
+OURBOX_SUBSTRATE_ARCH=${OURBOX_SUBSTRATE_ARCH:-unknown}
+OURBOX_SUBSTRATE_PROFILE=${OURBOX_SUBSTRATE_PROFILE:-unknown}
+OURBOX_SUBSTRATE_K3S_VERSION=${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=${OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256:-unknown}
+OURBOX_SUBSTRATE_ARTIFACT_SOURCE=${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}
+OURBOX_SUBSTRATE_REF=${OURBOX_SUBSTRATE_REF:-unknown}
+OURBOX_SUBSTRATE_DIGEST=${OURBOX_SUBSTRATE_DIGEST:-unknown}
+OURBOX_SUBSTRATE_SELECTION_SOURCE=${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}
+OURBOX_SUBSTRATE_RELEASE_CHANNEL=${OURBOX_SUBSTRATE_RELEASE_CHANNEL:-}
 EOF
   sync
   umount "${SYS_ROOT_MP}"
@@ -501,7 +501,7 @@ main() {
 
   banner
   show_payload_metadata
-  show_airgap_platform_metadata
+  show_ourbox_substrate_metadata
 
   banner
   echo "Step 2 of 4: Review storage plan"

@@ -61,11 +61,11 @@ jobs:
             --github-path "${SW_OURBOX_OS_APPROVED_INPUTS_PATH}" \
             --artifact-key matchbox_airgap_platform \
             --channel-key candidate \
-            --env-var OURBOX_AIRGAP_PLATFORM_REF \
+            --env-var OURBOX_SUBSTRATE_REF \
             --github-env "${GITHUB_ENV}"
 
       - name: Fetch pinned upstream inputs
-        run: ./tools/fetch-airgap-platform.sh
+        run: ./tools/fetch-ourbox-substrate.sh
         env:
           OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS: "1"
 

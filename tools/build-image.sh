@@ -90,11 +90,11 @@ log "Preflight: checking for legacy naming terms"
 "${ROOT}/tools/check_legacy_terms.sh"
 
 log "Preflight: verifying airgap artifacts exist"
-[[ -x "${ROOT}/artifacts/airgap/k3s/k3s" ]] || die "missing k3s binary; run ./tools/fetch-airgap-platform.sh"
-[[ -f "${ROOT}/artifacts/airgap/k3s/k3s-airgap-images-arm64.tar" ]] || die "missing k3s airgap tar; run ./tools/fetch-airgap-platform.sh"
-[[ -f "${ROOT}/artifacts/airgap/manifest.env" ]] || die "missing airgap manifest.env; run ./tools/fetch-airgap-platform.sh"
+[[ -x "${ROOT}/artifacts/airgap/k3s/k3s" ]] || die "missing k3s binary; run ./tools/fetch-ourbox-substrate.sh"
+[[ -f "${ROOT}/artifacts/airgap/k3s/k3s-airgap-images-arm64.tar" ]] || die "missing k3s airgap tar; run ./tools/fetch-ourbox-substrate.sh"
+[[ -f "${ROOT}/artifacts/airgap/manifest.env" ]] || die "missing airgap manifest.env; run ./tools/fetch-ourbox-substrate.sh"
 if ! compgen -G "${ROOT}/artifacts/airgap/platform/images/*.tar" >/dev/null; then
-  die "missing platform image tars; run ./tools/fetch-airgap-platform.sh"
+  die "missing platform image tars; run ./tools/fetch-ourbox-substrate.sh"
 fi
 
 if $DOCKER ps -a --format '{{.Names}}' 2>/dev/null | grep -qx 'pigen_work'; then

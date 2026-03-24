@@ -29,10 +29,10 @@ published by `sw-ourbox-os`:
    - Pulled via `./tools/fetch-platform-contract.sh`
    - Synced into pi-gen via `./tools/sync-platform-contract-into-pigen.sh`
 
-2) **airgap-platform** (arch-specific: arm64/amd64)
+2) **ourbox-substrate** (arch-specific: arm64/amd64)
    - Contents: `k3s` binary, `k3s-airgap-images-<arch>.tar`, platform image tars, `manifest.env`
-   - Pulled via `./tools/fetch-airgap-platform.sh` (which also triggers the contract sync)
-   - Injected by pi-gen stage `02-airgap-platform`
+   - Pulled via `./tools/fetch-ourbox-substrate.sh` (which also triggers the contract sync)
+   - Injected by pi-gen stage `02-ourbox-substrate`
 
 Runtime expectation (in the built image):
 - `/opt/ourbox/airgap/k3s/{k3s,k3s-airgap-images-*.tar}`
@@ -62,8 +62,8 @@ During build, `ourbox-release` generation records platform contract provenance i
    that contains that approved snapshot.
 3. Let the official candidate workflow resolve exact upstream refs at workflow start.
 4. For local/manual runs outside the workflow wrappers, provide explicit
-   `OURBOX_PLATFORM_CONTRACT_REF` / `OURBOX_AIRGAP_PLATFORM_REF` values.
-5. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `pigen/`.
+   `OURBOX_PLATFORM_CONTRACT_REF` / `OURBOX_SUBSTRATE_REF` values.
+5. Run `./tools/fetch-ourbox-substrate.sh` to pull/sync into `pigen/`.
 6. Rebuild images; update release notes/changelog with the new digests.
 
 Host-composed installer media is separate:

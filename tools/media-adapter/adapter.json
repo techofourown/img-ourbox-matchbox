@@ -24,7 +24,7 @@
       "nightly": "rpi-nightly",
       "exp-labs": "rpi-exp-labs"
     },
-    "airgap_bundle_repo": "ghcr.io/techofourown/sw-ourbox-os/airgap-platform",
+    "airgap_bundle_repo": "ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate",
     "airgap_bundle_catalog_tag": "catalog-arm64",
     "airgap_bundle_channel_tags": {
       "stable": "stable-arm64",
@@ -62,6 +62,6 @@
   "notes": [
     "Matchbox mission media is now host-composed from a published installer substrate plus selected local mission artifacts.",
     "The target installer consumes only the embedded local mission directory and never performs runtime catalog browsing, install-defaults fetches, registry logins, or oras pulls.",
-    "Phase-two Matchbox compose stages the selected OS payload plus a selected arm64 airgap-platform bundle from upstream catalogs."
+    "Phase-two Matchbox compose stages the selected OS payload plus a selected arm64 ourbox-substrate bundle from upstream catalogs."
   ]
 }

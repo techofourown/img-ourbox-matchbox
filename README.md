@@ -74,7 +74,7 @@ This repo still owns the Matchbox target substrate:
 ```bash
 git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox.git
 cd img-ourbox-matchbox
-./tools/fetch-airgap-platform.sh
+./tools/fetch-ourbox-substrate.sh
 sudo -E ./tools/build-image.sh
 sudo -E ./tools/build-installer-image.sh
 ```
