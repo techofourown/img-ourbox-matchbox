@@ -32,12 +32,16 @@ Model identifies the physical hardware class; SKU identifies the exact bill-of-m
 **Official nightly builds are live.** OS and installer artifacts are published automatically on
 every push to `main` via organization-controlled build infrastructure.
 
-| Channel | OS artifact | Installer artifact |
-|---|---|---|
-| Nightly | `ghcr.io/techofourown/ourbox-matchbox-os:rpi-nightly` | `ghcr.io/techofourown/ourbox-matchbox-installer:rpi-installer-nightly` |
-| Stable | `ghcr.io/techofourown/ourbox-matchbox-os:rpi-stable` | `ghcr.io/techofourown/ourbox-matchbox-installer:rpi-installer-stable` |
+Official channel tags: `rpi-beta`, `rpi-stable`, `rpi-nightly`, `rpi-exp-labs`,
+`rpi-installer-beta`, `rpi-installer-stable`, `rpi-installer-nightly`,
+`rpi-installer-exp-labs`
 
-Stable is promoted on `v*` tag push. All artifacts are digest-addressable OCI artifacts on GHCR.
+- Official candidate: push to `main` via `.github/workflows/official-candidate.yml` → publishes `rpi-beta` / `rpi-installer-beta`
+- Integration nightly: daily cron via `.github/workflows/integration-nightly.yml` → publishes `rpi-nightly` / `rpi-installer-nightly`
+- Stable promotion: GitHub Release `published` via `.github/workflows/official-promote-stable.yml`
+- Exp-labs promotion: GitHub Release `prereleased` via `.github/workflows/official-exp-labs.yml`
+
+All artifacts are digest-addressable OCI artifacts on GHCR.
 See [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) for official release channels,
 provenance metadata, and how to verify artifacts.
 
@@ -74,7 +78,7 @@ This repo still owns the Matchbox target substrate:
 ```bash
 git clone --recurse-submodules https://github.com/techofourown/img-ourbox-matchbox.git
 cd img-ourbox-matchbox
-./tools/fetch-airgap-platform.sh
+./tools/fetch-ourbox-substrate.sh
 sudo -E ./tools/build-image.sh
 sudo -E ./tools/build-installer-image.sh
 ```

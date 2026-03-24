@@ -47,11 +47,11 @@ jobs:
             --github-path "${SW_OURBOX_OS_APPROVED_INPUTS_PATH}" \
             --artifact-key matchbox_airgap_platform \
             --channel-key nightly \
-            --env-var OURBOX_AIRGAP_PLATFORM_REF \
+            --env-var OURBOX_SUBSTRATE_REF \
             --github-env "${GITHUB_ENV}"
 
       - name: Fetch nightly upstream inputs
-        run: ./tools/fetch-airgap-platform.sh
+        run: ./tools/fetch-ourbox-substrate.sh
 
       - name: Build OS image
         run: sudo -E ./tools/build-image.sh

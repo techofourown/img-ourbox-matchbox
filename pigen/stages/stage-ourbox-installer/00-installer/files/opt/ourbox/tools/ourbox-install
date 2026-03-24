@@ -1,45 +1,61 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shellcheck disable=SC1091
-source /opt/ourbox/tools/lib.sh
+OURBOX_INSTALL_LIBRARY_ONLY="${OURBOX_INSTALL_LIBRARY_ONLY:-0}"
+INSTALLER_LOG="${OURBOX_INSTALLER_LOG:-/run/ourbox-installer.log}"
+OURBOX_INSTALL_IS_SOURCED=0
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  OURBOX_INSTALL_IS_SOURCED=1
+fi
 
-INSTALLER_LOG="/run/ourbox-installer.log"
-if command -v tee >/dev/null 2>&1; then
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" == "1" && "${OURBOX_INSTALL_IS_SOURCED}" != "1" ]]; then
+  printf 'ERROR: OURBOX_INSTALL_LIBRARY_ONLY=1 is supported only when sourcing %s\n' "${BASH_SOURCE[0]}" >&2
+  exit 1
+fi
+
+TOOLS_ROOT="${OURBOX_INSTALL_TOOLS_ROOT:-/opt/ourbox/tools}"
+# shellcheck disable=SC1091
+source "${TOOLS_ROOT}/lib.sh"
+
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]] && command -v tee >/dev/null 2>&1; then
   exec > >(tee -a "${INSTALLER_LOG}") 2>&1
 fi
 
-need_cmd xz
-need_cmd xzcat
-need_cmd sha256sum
-need_cmd dd
-need_cmd lsblk
-need_cmd readlink
-need_cmd findmnt
-need_cmd blkid
-need_cmd partprobe
-need_cmd wipefs
-need_cmd blockdev
-need_cmd parted
-need_cmd mkfs.ext4
-need_cmd mount
-need_cmd umount
-need_cmd mountpoint
+need_cmd awk
+need_cmd cmp
 need_cmd find
-need_cmd openssl
-need_cmd sync
-need_cmd tar
-need_cmd ip
-need_cmd sort
-need_cmd udevadm
 need_cmd python3
+need_cmd sha256sum
+need_cmd tar
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]]; then
+  need_cmd xz
+  need_cmd xzcat
+  need_cmd dd
+  need_cmd lsblk
+  need_cmd readlink
+  need_cmd findmnt
+  need_cmd blkid
+  need_cmd partprobe
+  need_cmd wipefs
+  need_cmd blockdev
+  need_cmd parted
+  need_cmd mkfs.ext4
+  need_cmd mount
+  need_cmd umount
+  need_cmd mountpoint
+  need_cmd openssl
+  need_cmd sync
+  need_cmd ip
+  need_cmd sort
+  need_cmd udevadm
+fi
 
-DATA_CHECK_MP="/run/ourbox-installer/data-check"
-SYS_BOOT_MP="/run/ourbox-installer/sys-boot"
-SYS_ROOT_MP="/run/ourbox-installer/sys-root"
-MISSION_ROOT="/opt/ourbox/mission"
-AIRGAP_EXTRACT_DIR="/opt/ourbox/installer/cache/airgap-platform"
-DEFAULTS_ENV="/opt/ourbox/installer/defaults.env"
+DATA_CHECK_MP="${OURBOX_INSTALL_DATA_CHECK_MP:-/run/ourbox-installer/data-check}"
+SYS_BOOT_MP="${OURBOX_INSTALL_SYS_BOOT_MP:-/run/ourbox-installer/sys-boot}"
+SYS_ROOT_MP="${OURBOX_INSTALL_SYS_ROOT_MP:-/run/ourbox-installer/sys-root}"
+MISSION_ROOT="${OURBOX_INSTALL_MISSION_ROOT:-/opt/ourbox/mission}"
+AIRGAP_EXTRACT_DIR="${OURBOX_INSTALL_AIRGAP_EXTRACT_DIR:-/opt/ourbox/installer/cache/ourbox-substrate}"
+DEFAULTS_ENV="${OURBOX_INSTALL_DEFAULTS_ENV:-/opt/ourbox/installer/defaults.env}"
 
 INSTALLER_ID=""
 INSTALLER_VERSION=""
@@ -56,19 +72,19 @@ INSTALL_SELECTION_SOURCE=""
 RELEASE_CHANNEL=""
 PLATFORM_CONTRACT_DIGEST=""
 
-OURBOX_AIRGAP_PLATFORM_SOURCE=""
-OURBOX_AIRGAP_PLATFORM_REVISION=""
-OURBOX_AIRGAP_PLATFORM_VERSION=""
-OURBOX_AIRGAP_PLATFORM_CREATED=""
-OURBOX_AIRGAP_PLATFORM_ARCH=""
-OURBOX_AIRGAP_PLATFORM_PROFILE=""
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=""
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=""
-OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="mission"
-OURBOX_AIRGAP_PLATFORM_REF=""
-OURBOX_AIRGAP_PLATFORM_DIGEST=""
-OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=""
-OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=""
+OURBOX_SUBSTRATE_SOURCE=""
+OURBOX_SUBSTRATE_REVISION=""
+OURBOX_SUBSTRATE_VERSION=""
+OURBOX_SUBSTRATE_CREATED=""
+OURBOX_SUBSTRATE_ARCH=""
+OURBOX_SUBSTRATE_PROFILE=""
+OURBOX_SUBSTRATE_K3S_VERSION=""
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=""
+OURBOX_SUBSTRATE_ARTIFACT_SOURCE="mission"
+OURBOX_SUBSTRATE_REF=""
+OURBOX_SUBSTRATE_DIGEST=""
+OURBOX_SUBSTRATE_SELECTION_SOURCE=""
+OURBOX_SUBSTRATE_RELEASE_CHANNEL=""
 AIRGAP_MANIFEST_PATH=""
 
 IDENTITY_USERNAME="ourbox"
@@ -77,7 +93,7 @@ IDENTITY_PASSWORD_HASH=""
 MATCHBOX_DATA_CHECK_MP="${DATA_CHECK_MP}"
 
 # shellcheck disable=SC1091
-source /opt/ourbox/tools/matchbox-storage-flow.sh
+source "${TOOLS_ROOT}/matchbox-storage-flow.sh"
 
 cleanup_mounts() {
   matchbox_cleanup_data_check_mp
@@ -113,7 +129,9 @@ finalize() {
 
   exec /bin/bash -l
 }
-trap finalize EXIT
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]]; then
+  trap finalize EXIT
+fi
 
 confirm_exact_answer() {
   local expected="$1"
@@ -195,13 +213,13 @@ show_install_plan() {
   fi
   echo "  Digest      : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  Payload SHA : ${PAYLOAD_SHA256}"
-  echo "  Apps bundle : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Apps source : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Apps select : ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Apps lane   : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Apps bundle : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Apps source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Apps select : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Apps lane   : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Apps digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  echo "  Apps digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   if [[ "${MATCHBOX_SYSTEM_DISK_WAS_DATA}" == "1" ]]; then
@@ -222,13 +240,13 @@ show_completion_summary() {
   fi
   echo "  Digest      : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  Payload SHA : ${PAYLOAD_SHA256}"
-  echo "  Apps bundle : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Apps source : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Apps select : ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Apps lane   : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Apps bundle : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Apps source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Apps select : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Apps lane   : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Apps digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  echo "  Apps digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   echo
@@ -248,6 +266,35 @@ matchbox_partition_path() {
 parse_sha256_file() {
   local file="$1"
   awk 'NF>=1 {print $1; exit}' "${file}"
+}
+
+resolve_path_within_root() {
+  local root="$1"
+  local label="$2"
+  local relpath="$3"
+
+  python3 - <<'PY' "${root}" "${label}" "${relpath}"
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).resolve()
+label = sys.argv[2]
+relpath = sys.argv[3].strip()
+if not relpath:
+    raise SystemExit(f"{label} must be set")
+
+candidate = (root / relpath).resolve()
+try:
+    candidate.relative_to(root)
+except ValueError as exc:
+    raise SystemExit(f"{label} must stay within the mission directory") from exc
+
+print(candidate)
+PY
+}
+
+resolve_mission_relpath() {
+  resolve_path_within_root "${MISSION_ROOT}" "$1" "$2"
 }
 
 normalize_installer_config() {
@@ -276,14 +323,20 @@ import sys
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
     manifest = json.load(handle)
 
-if manifest.get("schema") != 1 or manifest.get("kind") != "ourbox-mission":
-    raise SystemExit("mission-manifest.json must declare schema=1 and kind=ourbox-mission")
+if manifest.get("kind") != "ourbox-mission":
+    raise SystemExit("mission-manifest.json must declare kind=ourbox-mission")
 target = manifest.get("target") or {}
 if target.get("id") != "matchbox":
     raise SystemExit("mission target id must be matchbox")
+requested = manifest.get("requested")
+if not isinstance(requested, dict) or not requested:
+    raise SystemExit("mission-manifest.json must include a requested object")
+resolved = manifest.get("resolved")
+if not isinstance(resolved, dict) or not resolved:
+    raise SystemExit("mission-manifest.json must include a resolved object")
 
-selected_os = manifest.get("selected_os") or {}
-selected_airgap = manifest.get("selected_airgap") or {}
+selected_os = resolved.get("os") or {}
+selected_airgap = resolved.get("airgap") or {}
 platform_contract = manifest.get("platform_contract") or {}
 
 values = [
@@ -313,15 +366,16 @@ PY
   RELEASE_CHANNEL="${mission_fields[1]}"
   OS_ARTIFACT_REF="${mission_fields[2]}"
   OS_ARTIFACT_DIGEST="${mission_fields[3]}"
-  PAYLOAD_PATH="${MISSION_ROOT}/${mission_fields[4]}"
-  PAYLOAD_META="${MISSION_ROOT}/${mission_fields[5]}"
+  PAYLOAD_PATH="$(resolve_mission_relpath "mission OS payload relpath" "${mission_fields[4]}")"
+  PAYLOAD_META="$(resolve_mission_relpath "mission OS metadata relpath" "${mission_fields[5]}")"
   PLATFORM_CONTRACT_DIGEST="${mission_fields[6]}"
-  OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="${mission_fields[7]}"
-  OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${mission_fields[8]}"
-  OURBOX_AIRGAP_PLATFORM_REF="${mission_fields[9]}"
-  OURBOX_AIRGAP_PLATFORM_DIGEST="${mission_fields[10]}"
-  local airgap_payload="${MISSION_ROOT}/${mission_fields[11]}"
-  AIRGAP_MANIFEST_PATH="${MISSION_ROOT}/${mission_fields[12]}"
+  OURBOX_SUBSTRATE_SELECTION_SOURCE="${mission_fields[7]}"
+  OURBOX_SUBSTRATE_RELEASE_CHANNEL="${mission_fields[8]}"
+  OURBOX_SUBSTRATE_REF="${mission_fields[9]}"
+  OURBOX_SUBSTRATE_DIGEST="${mission_fields[10]}"
+  local airgap_payload=""
+  airgap_payload="$(resolve_mission_relpath "mission application bundle relpath" "${mission_fields[11]}")"
+  AIRGAP_MANIFEST_PATH="$(resolve_mission_relpath "mission application bundle manifest relpath" "${mission_fields[12]}")"
 
   [[ -f "${PAYLOAD_PATH}" ]] || die "mission OS payload missing: ${PAYLOAD_PATH}"
   [[ -f "${PAYLOAD_META}" ]] || die "mission OS metadata missing: ${PAYLOAD_META}"
@@ -365,17 +419,17 @@ PY
   source "${AIRGAP_MANIFEST_PATH}"
   [[ "${OURBOX_PLATFORM_CONTRACT_DIGEST:-}" == "${PLATFORM_CONTRACT_DIGEST}" ]] \
     || die "mission application bundle contract digest mismatch"
-  [[ "${AIRGAP_PLATFORM_ARCH:-}" == "arm64" ]] \
-    || die "mission application bundle arch mismatch: expected arm64, got ${AIRGAP_PLATFORM_ARCH:-unknown}"
+  [[ "${OURBOX_SUBSTRATE_ARCH:-}" == "arm64" ]] \
+    || die "mission application bundle arch mismatch: expected arm64, got ${OURBOX_SUBSTRATE_ARCH:-unknown}"
 
-  OURBOX_AIRGAP_PLATFORM_SOURCE="${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_REVISION="${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_VERSION="${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_CREATED="${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_ARCH="${AIRGAP_PLATFORM_ARCH:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_PROFILE="${OURBOX_PLATFORM_PROFILE:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_K3S_VERSION="${K3S_VERSION:-unknown}"
-  OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${OURBOX_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
+  OURBOX_SUBSTRATE_SOURCE="${OURBOX_SUBSTRATE_SOURCE:-unknown}"
+  OURBOX_SUBSTRATE_REVISION="${OURBOX_SUBSTRATE_REVISION:-unknown}"
+  OURBOX_SUBSTRATE_VERSION="${OURBOX_SUBSTRATE_VERSION:-unknown}"
+  OURBOX_SUBSTRATE_CREATED="${OURBOX_SUBSTRATE_CREATED:-unknown}"
+  OURBOX_SUBSTRATE_ARCH="${OURBOX_SUBSTRATE_ARCH:-unknown}"
+  OURBOX_SUBSTRATE_PROFILE="${OURBOX_PLATFORM_PROFILE:-unknown}"
+  OURBOX_SUBSTRATE_K3S_VERSION="${K3S_VERSION:-unknown}"
+  OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="${OURBOX_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
 }
 
 show_payload_metadata() {
@@ -391,24 +445,24 @@ show_payload_metadata() {
   echo
 }
 
-show_airgap_platform_metadata() {
+show_ourbox_substrate_metadata() {
   echo
   echo "Application bundle:"
-  echo "  Selection source: ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Release channel : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Selection source: ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Release channel : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Artifact source : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Artifact ref    : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Artifact digest : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
-  echo "  Upstream source : ${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}"
-  echo "  Revision        : ${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}"
-  echo "  Version         : ${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}"
-  echo "  Created         : ${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}"
-  echo "  Arch            : ${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}"
-  echo "  Profile         : ${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}"
-  echo "  K3s version     : ${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}"
-  echo "  Images lock sha : ${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
+  echo "  Artifact source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Artifact ref    : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Artifact digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
+  echo "  Upstream source : ${OURBOX_SUBSTRATE_SOURCE:-unknown}"
+  echo "  Revision        : ${OURBOX_SUBSTRATE_REVISION:-unknown}"
+  echo "  Version         : ${OURBOX_SUBSTRATE_VERSION:-unknown}"
+  echo "  Created         : ${OURBOX_SUBSTRATE_CREATED:-unknown}"
+  echo "  Arch            : ${OURBOX_SUBSTRATE_ARCH:-unknown}"
+  echo "  Profile         : ${OURBOX_SUBSTRATE_PROFILE:-unknown}"
+  echo "  K3s version     : ${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}"
+  echo "  Images lock sha : ${OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256:-unknown}"
   echo
 }
 
@@ -422,7 +476,7 @@ teardown_installer_ssh() {
   log "Installer SSH service stopped for this session."
 }
 
-overlay_selected_airgap_platform_into_mounted_root() {
+overlay_selected_ourbox_substrate_into_mounted_root() {
   local target_airgap="${SYS_ROOT_MP}/opt/ourbox/airgap"
   local target_platform="${target_airgap}/platform"
 
@@ -448,7 +502,7 @@ write_install_provenance() {
   fi
 
   mount "${root_part}" "${SYS_ROOT_MP}"
-  overlay_selected_airgap_platform_into_mounted_root
+  overlay_selected_ourbox_substrate_into_mounted_root
   release_file="${SYS_ROOT_MP}/etc/ourbox/release"
   [[ -f "${release_file}" ]] || die "installed release metadata missing: ${release_file}"
 
@@ -464,19 +518,19 @@ OURBOX_INSTALL_DEFAULTS_SOURCE=none
 OURBOX_INSTALL_DEFAULTS_REF=
 OURBOX_INSTALL_SELECTION_SOURCE=${INSTALL_SELECTION_SOURCE:-unknown}
 OURBOX_RELEASE_CHANNEL=${RELEASE_CHANNEL:-}
-OURBOX_AIRGAP_PLATFORM_SOURCE=${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_REVISION=${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}
-OURBOX_AIRGAP_PLATFORM_VERSION=${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}
-OURBOX_AIRGAP_PLATFORM_CREATED=${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}
-OURBOX_AIRGAP_PLATFORM_ARCH=${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}
-OURBOX_AIRGAP_PLATFORM_PROFILE=${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}
-OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_REF=${OURBOX_AIRGAP_PLATFORM_REF:-unknown}
-OURBOX_AIRGAP_PLATFORM_DIGEST=${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}
-OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL:-}
+OURBOX_SUBSTRATE_SOURCE=${OURBOX_SUBSTRATE_SOURCE:-unknown}
+OURBOX_SUBSTRATE_REVISION=${OURBOX_SUBSTRATE_REVISION:-unknown}
+OURBOX_SUBSTRATE_VERSION=${OURBOX_SUBSTRATE_VERSION:-unknown}
+OURBOX_SUBSTRATE_CREATED=${OURBOX_SUBSTRATE_CREATED:-unknown}
+OURBOX_SUBSTRATE_ARCH=${OURBOX_SUBSTRATE_ARCH:-unknown}
+OURBOX_SUBSTRATE_PROFILE=${OURBOX_SUBSTRATE_PROFILE:-unknown}
+OURBOX_SUBSTRATE_K3S_VERSION=${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=${OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256:-unknown}
+OURBOX_SUBSTRATE_ARTIFACT_SOURCE=${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}
+OURBOX_SUBSTRATE_REF=${OURBOX_SUBSTRATE_REF:-unknown}
+OURBOX_SUBSTRATE_DIGEST=${OURBOX_SUBSTRATE_DIGEST:-unknown}
+OURBOX_SUBSTRATE_SELECTION_SOURCE=${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}
+OURBOX_SUBSTRATE_RELEASE_CHANNEL=${OURBOX_SUBSTRATE_RELEASE_CHANNEL:-}
 EOF
   sync
   umount "${SYS_ROOT_MP}"
@@ -501,7 +555,7 @@ main() {
 
   banner
   show_payload_metadata
-  show_airgap_platform_metadata
+  show_ourbox_substrate_metadata
 
   banner
   echo "Step 2 of 4: Review storage plan"
@@ -584,4 +638,6 @@ main() {
   show_completion_summary
 }
 
-main "$@"
+if [[ "${OURBOX_INSTALL_LIBRARY_ONLY}" != "1" ]]; then
+  main "$@"
+fi

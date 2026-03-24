@@ -11,7 +11,7 @@ assert_required_env_failure() {
   shift 2
   local log_file="${TMP_ROOT}/${label}.log"
 
-  if env -u OURBOX_PLATFORM_CONTRACT_REF -u OURBOX_AIRGAP_PLATFORM_REF "$@" >"${log_file}" 2>&1; then
+  if env -u OURBOX_PLATFORM_CONTRACT_REF -u OURBOX_SUBSTRATE_REF "$@" >"${log_file}" 2>&1; then
     echo "expected ${label} to fail without explicit upstream ref env" >&2
     cat "${log_file}" >&2
     exit 1
@@ -30,8 +30,8 @@ assert_required_env_failure \
   bash "${ROOT}/tools/fetch-platform-contract.sh"
 
 assert_required_env_failure \
-  fetch-airgap-platform \
-  "OURBOX_AIRGAP_PLATFORM_REF is required." \
-  bash "${ROOT}/tools/fetch-airgap-platform.sh"
+  fetch-ourbox-substrate \
+  "OURBOX_SUBSTRATE_REF is required." \
+  bash "${ROOT}/tools/fetch-ourbox-substrate.sh"
 
 printf '[%s] Matchbox upstream input env contract smoke passed\n' "$(date -Is)"

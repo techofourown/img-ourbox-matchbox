@@ -174,7 +174,7 @@ Source-controlled intent is:
 
 At workflow start, the official candidate build resolves that approved snapshot
 into exact digest-pinned refs for `PLATFORM_CONTRACT_REF` and
-`AIRGAP_PLATFORM_REF`. Those resolved immutable identities are then recorded in
+`OURBOX_SUBSTRATE_REF`. Those resolved immutable identities are then recorded in
 workflow provenance and artifact metadata.
 
 The scheduled nightly integration build intentionally bypasses the approved

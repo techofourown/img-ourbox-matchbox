@@ -200,23 +200,23 @@ def validate_airgap_bundle(payload_path: pathlib.Path, manifest_path: pathlib.Pa
                     str(strict_metadata_parser),
                     str(manifest_path),
                     "--allow",
-                    "OURBOX_AIRGAP_PLATFORM_SCHEMA",
+                    "OURBOX_SUBSTRATE_SCHEMA",
                     "--allow",
-                    "OURBOX_AIRGAP_PLATFORM_KIND",
+                    "OURBOX_SUBSTRATE_KIND",
                     "--allow",
-                    "OURBOX_AIRGAP_PLATFORM_SOURCE",
+                    "OURBOX_SUBSTRATE_SOURCE",
                     "--allow",
-                    "OURBOX_AIRGAP_PLATFORM_REVISION",
+                    "OURBOX_SUBSTRATE_REVISION",
                     "--allow",
-                    "OURBOX_AIRGAP_PLATFORM_VERSION",
+                    "OURBOX_SUBSTRATE_VERSION",
                     "--allow",
-                    "OURBOX_AIRGAP_PLATFORM_CREATED",
+                    "OURBOX_SUBSTRATE_CREATED",
                     "--allow",
                     "OURBOX_PLATFORM_CONTRACT_REF",
                     "--allow",
                     "OURBOX_PLATFORM_CONTRACT_DIGEST",
                     "--allow",
-                    "AIRGAP_PLATFORM_ARCH",
+                    "OURBOX_SUBSTRATE_ARCH",
                     "--allow",
                     "K3S_VERSION",
                     "--allow",
@@ -226,17 +226,17 @@ def validate_airgap_bundle(payload_path: pathlib.Path, manifest_path: pathlib.Pa
                     "--allow",
                     "OURBOX_PLATFORM_IMAGES_LOCK_SHA256",
                     "--require",
-                    "OURBOX_AIRGAP_PLATFORM_SOURCE",
+                    "OURBOX_SUBSTRATE_SOURCE",
                     "--require",
-                    "OURBOX_AIRGAP_PLATFORM_REVISION",
+                    "OURBOX_SUBSTRATE_REVISION",
                     "--require",
-                    "OURBOX_AIRGAP_PLATFORM_VERSION",
+                    "OURBOX_SUBSTRATE_VERSION",
                     "--require",
-                    "OURBOX_AIRGAP_PLATFORM_CREATED",
+                    "OURBOX_SUBSTRATE_CREATED",
                     "--require",
                     "OURBOX_PLATFORM_CONTRACT_DIGEST",
                     "--require",
-                    "AIRGAP_PLATFORM_ARCH",
+                    "OURBOX_SUBSTRATE_ARCH",
                     "--require",
                     "K3S_VERSION",
                     "--require",
@@ -246,17 +246,17 @@ def validate_airgap_bundle(payload_path: pathlib.Path, manifest_path: pathlib.Pa
                     "--require",
                     "OURBOX_PLATFORM_IMAGES_LOCK_SHA256",
                     "--print",
-                    "OURBOX_AIRGAP_PLATFORM_SOURCE",
+                    "OURBOX_SUBSTRATE_SOURCE",
                     "--print",
-                    "OURBOX_AIRGAP_PLATFORM_REVISION",
+                    "OURBOX_SUBSTRATE_REVISION",
                     "--print",
-                    "OURBOX_AIRGAP_PLATFORM_VERSION",
+                    "OURBOX_SUBSTRATE_VERSION",
                     "--print",
-                    "OURBOX_AIRGAP_PLATFORM_CREATED",
+                    "OURBOX_SUBSTRATE_CREATED",
                     "--print",
                     "OURBOX_PLATFORM_CONTRACT_DIGEST",
                     "--print",
-                    "AIRGAP_PLATFORM_ARCH",
+                    "OURBOX_SUBSTRATE_ARCH",
                     "--print",
                     "K3S_VERSION",
                     "--print",
@@ -301,8 +301,14 @@ def validate_airgap_bundle(payload_path: pathlib.Path, manifest_path: pathlib.Pa
         raise SystemExit(f"mission selected_airgap.payload_relpath is not a valid gzip tarball: {exc}") from exc
 
 
-if manifest.get("schema") != 1 or manifest.get("kind") != "ourbox-mission":
-    raise SystemExit("mission-manifest.json must declare schema=1 and kind=ourbox-mission")
+if manifest.get("kind") != "ourbox-mission":
+    raise SystemExit("mission-manifest.json must declare kind=ourbox-mission")
+requested = manifest.get("requested")
+if not isinstance(requested, dict) or not requested:
+    raise SystemExit("mission requested must be present")
+resolved = manifest.get("resolved")
+if not isinstance(resolved, dict) or not resolved:
+    raise SystemExit("mission resolved must be present")
 
 target = manifest.get("target") or {}
 if target.get("id") != adapter["target_id"]:
@@ -318,7 +324,7 @@ mission_media = manifest.get("mission_media") or {}
 if mission_media.get("compose_strategy") != "matchbox-fat-image-with-host-selected-os-and-airgap":
     raise SystemExit("mission compose strategy must be matchbox-fat-image-with-host-selected-os-and-airgap")
 
-substrate = manifest.get("substrate") or {}
+substrate = resolved.get("substrate") or {}
 if substrate.get("strategy") != "published-installer-substrate":
     raise SystemExit("mission substrate.strategy must be published-installer-substrate")
 if substrate.get("compose_entrypoint") != "tools/media-adapter/compose-media.sh":
@@ -336,7 +342,7 @@ platform_contract_digest = str(platform_contract.get("digest", "")).strip()
 if not sha256_re.fullmatch(platform_contract_digest):
     raise SystemExit("mission platform_contract.digest must be sha256:...")
 
-selected_os = manifest.get("selected_os") or {}
+selected_os = resolved.get("os") or {}
 os_artifact_ref = str(selected_os.get("artifact_ref", "")).strip()
 os_artifact_digest = str(selected_os.get("artifact_digest", "")).strip()
 os_artifact_type = str(selected_os.get("artifact_type", "")).strip()
@@ -415,25 +421,25 @@ parse_os_meta = subprocess.run(
         "--allow",
         "K3S_VERSION",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_REF",
+        "OURBOX_SUBSTRATE_REF",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_DIGEST",
+        "OURBOX_SUBSTRATE_DIGEST",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_SOURCE",
+        "OURBOX_SUBSTRATE_SOURCE",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_REVISION",
+        "OURBOX_SUBSTRATE_REVISION",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_VERSION",
+        "OURBOX_SUBSTRATE_VERSION",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_CREATED",
+        "OURBOX_SUBSTRATE_CREATED",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_ARCH",
+        "OURBOX_SUBSTRATE_ARCH",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_PROFILE",
+        "OURBOX_SUBSTRATE_PROFILE",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_K3S_VERSION",
+        "OURBOX_SUBSTRATE_K3S_VERSION",
         "--allow",
-        "OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256",
+        "OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256",
         "--require",
         "OS_ARTIFACT_TYPE",
         "--require",
@@ -457,16 +463,16 @@ if os_meta_fields[0] != expected_type:
 if os_meta_fields[1] != platform_contract_digest:
     raise SystemExit("selected_os.metadata_relpath OURBOX_PLATFORM_CONTRACT_DIGEST does not match platform_contract.digest")
 
-selected_airgap = manifest.get("selected_airgap") or {}
+selected_airgap = resolved.get("airgap") or {}
 airgap_artifact_ref = str(selected_airgap.get("artifact_ref", "")).strip()
 airgap_artifact_digest = str(selected_airgap.get("artifact_digest", "")).strip()
-airgap_platform_contract = str(selected_airgap.get("platform_contract_digest", "")).strip()
+airgap_substrate_contract = str(selected_airgap.get("platform_contract_digest", "")).strip()
 airgap_arch = str(selected_airgap.get("arch", "")).strip()
 if not pinned_ref_re.fullmatch(airgap_artifact_ref):
     raise SystemExit("mission selected_airgap.artifact_ref must be digest-pinned")
 if not sha256_re.fullmatch(airgap_artifact_digest):
     raise SystemExit("mission selected_airgap.artifact_digest must be sha256:...")
-if airgap_platform_contract != platform_contract_digest:
+if airgap_substrate_contract != platform_contract_digest:
     raise SystemExit("mission selected_airgap.platform_contract_digest must match platform_contract.digest")
 if airgap_arch != expected_arch:
     raise SystemExit(f"mission selected_airgap.arch must be {expected_arch}")
@@ -479,7 +485,7 @@ staged_airgap_manifest = require_staged_file("selected_airgap.manifest_relpath",
 validate_sha256_sidecar("selected_airgap.payload_relpath", airgap_payload_relpath, staged_airgap_payload)
 validate_airgap_bundle(staged_airgap_payload, staged_airgap_manifest, platform_contract_digest)
 
-installed_target_ssh = manifest.get("installed_target_ssh")
+installed_target_ssh = resolved.get("installed_target_ssh")
 if installed_target_ssh is not None:
     mode = str(installed_target_ssh.get("mode", "")).strip()
     if mode != "host-generated-authorized-key":

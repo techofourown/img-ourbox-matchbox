@@ -19,7 +19,7 @@ SRC="${ROOT}/artifacts/platform-contract/extracted/platform-contract"
 
 "${ROOT}/tools/validate-platform-contract-shape.sh" "${SRC}"
 
-STAGE_FILES="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-airgap-platform/files"
+STAGE_FILES="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-ourbox-substrate/files"
 DST_BASE="${STAGE_FILES}/opt/ourbox/airgap/platform"
 
 rm -rf "${DST_BASE}"

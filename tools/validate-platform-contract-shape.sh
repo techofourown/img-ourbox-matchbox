@@ -11,7 +11,8 @@ die() {
 
 [[ -d "${CONTRACT_DIR}" ]] || die "platform contract directory not found: ${CONTRACT_DIR}"
 
-# The current runtime seam expects render/verify tools, demo-app profile data,
+# The current runtime seam expects render/verify tools, demo-app profile data
+# (excluding images.lock.json which is now generated at build time),
 # and the workload manifests that were absent from the older two-file contract.
 required_paths=(
   "contract.env"
@@ -20,7 +21,6 @@ required_paths=(
   "tools/render-contract.py"
   "tools/verify-runtime.sh"
   "profiles/demo-apps/profile.env"
-  "profiles/demo-apps/images.lock.json"
   "rendered/defaults/demo-apps/selected-app-surface.json"
 )
 

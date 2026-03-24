@@ -182,16 +182,16 @@ newest_img_xz() {
   echo "${img}"
 }
 
-resolve_default_airgap_platform_ref() {
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]]; then
-    log "Using preselected airgap platform ref: ${OURBOX_AIRGAP_PLATFORM_REF}"
+resolve_default_substrate_ref() {
+  if [[ -n "${OURBOX_SUBSTRATE_REF:-}" ]]; then
+    log "Using preselected ourbox-substrate ref: ${OURBOX_SUBSTRATE_REF}"
     return 0
   fi
 
   # shellcheck disable=SC1091
   source "${ROOT}/tools/approved-upstream-inputs.upstream.env"
   need_cmd python3
-  OURBOX_AIRGAP_PLATFORM_REF="$(
+  OURBOX_SUBSTRATE_REF="$(
     python3 "${ROOT}/tools/release-control/release_control.py" resolve-approved-upstream-input \
       --github-repo "${SW_OURBOX_OS_APPROVED_INPUTS_REPO}" \
       --github-ref "${SW_OURBOX_OS_APPROVED_INPUTS_REVISION}" \
@@ -199,8 +199,8 @@ resolve_default_airgap_platform_ref() {
       --artifact-key matchbox_airgap_platform \
       --channel-key candidate
   )"
-  export OURBOX_AIRGAP_PLATFORM_REF
-  log "Resolved airgap platform ref for ops-e2e from approved snapshot: ${OURBOX_AIRGAP_PLATFORM_REF}"
+  export OURBOX_SUBSTRATE_REF
+  log "Resolved ourbox-substrate ref for ops-e2e from approved snapshot: ${OURBOX_SUBSTRATE_REF}"
 }
 
 compute_os_artifact_ref_from_img() {
@@ -235,15 +235,15 @@ main() {
   export DOCKER="${DOCKER:-$(pick_container_cli)}"
   log "Using container CLI: ${DOCKER}"
 
-  resolve_default_airgap_platform_ref
+  resolve_default_substrate_ref
 
-  log "Fetching airgap artifacts"
-  "${ROOT}/tools/fetch-airgap-platform.sh"
+  log "Fetching ourbox-substrate artifacts"
+  "${ROOT}/tools/fetch-ourbox-substrate.sh"
 
   if [[ -f "${ROOT}/artifacts/airgap/manifest.env" ]]; then
     # shellcheck disable=SC1090,SC1091
     source "${ROOT}/artifacts/airgap/manifest.env"
-    log "Airgap pins: ARCH=${AIRGAP_PLATFORM_ARCH:-?} K3S_VERSION=${K3S_VERSION:-?}"
+    log "Substrate pins: ARCH=${OURBOX_SUBSTRATE_ARCH:-?} K3S_VERSION=${K3S_VERSION:-?}"
   fi
 
   log "Running build-host loop preflight"
