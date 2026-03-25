@@ -126,6 +126,7 @@ catalog_apps = catalog.get("apps")
 if not isinstance(catalog_apps, list) or not catalog_apps:
     raise SystemExit(f"{catalog_path} must declare a non-empty apps list")
 catalog_app_ids = set()
+catalog_apps_by_id = {}
 for app in catalog_apps:
     app_id = str(app.get("id", "")).strip()
     if not app_id:
@@ -133,6 +134,7 @@ for app in catalog_apps:
     if app_id in catalog_app_ids:
         raise SystemExit(f"{catalog_path} duplicates app id {app_id}")
     catalog_app_ids.add(app_id)
+    catalog_apps_by_id[app_id] = app
 
 if selected.get("schema") != 1:
     raise SystemExit(f"{selected_apps_path} must declare schema=1")
@@ -162,6 +164,7 @@ for raw_app_id in selected_ids:
 images = images_lock.get("images")
 if not isinstance(images, list) or not images:
     raise SystemExit(f"{images_lock_path} must declare a non-empty images list")
+seen_image_names = set()
 for image in images:
     name = str(image.get("name", "")).strip()
     ref = str(image.get("ref", "")).strip()
@@ -169,6 +172,41 @@ for image in images:
         raise SystemExit(f"{images_lock_path} contains an image without a name")
     if not ref:
         raise SystemExit(f"{images_lock_path} contains an image without a ref")
+    if name in seen_image_names:
+        raise SystemExit(f"{images_lock_path} duplicates image name {name}")
+    seen_image_names.add(name)
+
+for app_id in seen_ids:
+    app = catalog_apps_by_id[app_id]
+    image_names = app.get("image_names")
+    if not isinstance(image_names, list) or not image_names:
+        raise SystemExit(f"{catalog_path} app {app_id} must declare a non-empty image_names list")
+    normalized_image_names = set()
+    for raw_image_name in image_names:
+        image_name = str(raw_image_name).strip()
+        if not image_name:
+            raise SystemExit(f"{catalog_path} app {app_id} contains an empty image_names entry")
+        normalized_image_names.add(image_name)
+    services = app.get("services")
+    if not isinstance(services, list) or not services:
+        raise SystemExit(f"{catalog_path} app {app_id} must declare a non-empty services list")
+    for service in services:
+        service_name = str(service.get("name", "")).strip()
+        if not service_name:
+            raise SystemExit(f"{catalog_path} app {app_id} contains a service without a name")
+        image_name = str(service.get("image", "")).strip()
+        if not image_name:
+            raise SystemExit(f"{catalog_path} app {app_id} service {service_name} must declare an image")
+        if image_name not in normalized_image_names:
+            raise SystemExit(
+                f"{catalog_path} app {app_id} service {service_name} references image {image_name} "
+                "not listed in image_names"
+            )
+        if image_name not in seen_image_names:
+            raise SystemExit(
+                f"{images_lock_path} is missing image {image_name} required by selected app {app_id} "
+                f"service {service_name}"
+            )
 PY
 }
 
@@ -252,6 +290,7 @@ resolve_desired_contract_state() {
 current_contract_matches() {
   [[ -f "${MARKER}" ]] || return 1
   [[ -f "${APPLIED_CONTRACT_STATE}" ]] || return 1
+  [[ -f "${SELECTED_APP_SURFACE_STATE}" ]] || return 1
   cmp -s "${APPLIED_CONTRACT_STATE}" "${DESIRED_CONTRACT_STATE}"
 }
 

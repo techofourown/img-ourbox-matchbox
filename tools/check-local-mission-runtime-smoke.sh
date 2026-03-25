@@ -14,6 +14,7 @@ trap 'rm -rf "${TMP}"' EXIT
 
 TOOLS_DIR="${TMP}/tools"
 INSTALLER_SCRIPT="${TMP}/ourbox-install"
+BOOTSTRAP_SCRIPT="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-ourbox-substrate/files/usr/local/sbin/ourbox-bootstrap"
 MISSION_ROOT="${TMP}/mission"
 MISSION_OS_DIR="${MISSION_ROOT}/artifacts/os"
 MISSION_SUBSTRATE_DIR="${MISSION_ROOT}/artifacts/substrate"
@@ -64,9 +65,22 @@ cat > "${MISSION_SUBSTRATE_DIR}/catalog.json" <<'EOF'
   "kind": "ourbox-application-catalog",
   "catalog_id": "demo-apps",
   "catalog_name": "Demo Apps",
+  "default_app_ids": [
+    "landing"
+  ],
   "apps": [
     {
-      "id": "landing"
+      "id": "landing",
+      "image_names": [
+        "landing"
+      ],
+      "services": [
+        {
+          "name": "landing",
+          "image": "landing",
+          "port": 80
+        }
+      ]
     }
   ]
 }
@@ -99,7 +113,7 @@ cat > "${MISSION_ROOT}/mission-manifest.json" <<EOF
   "kind": "ourbox-mission",
   "target": {
     "id": "matchbox",
-    "media_kind": "installer-image"
+    "media_kind": "installer-usb"
   },
   "requested": {
     "os": {
@@ -239,6 +253,13 @@ cmp -s "${MISSION_SUBSTRATE_DIR}/catalog.json" \
 cmp -s "${MISSION_SUBSTRATE_DIR}/selected-apps.json" \
   "${TARGET_ROOT}/opt/ourbox/substrate/platform/selected-apps.json" \
   || die "matchbox runtime did not stage the mission selected applications file"
+
+grep -Fq 'selected-app-surface.json' "${BOOTSTRAP_SCRIPT}" \
+  || die "matchbox bootstrap does not persist selected-app-surface.json"
+grep -Fq "[[ -f \"\${SELECTED_APP_SURFACE_STATE}\" ]] || return 1" "${BOOTSTRAP_SCRIPT}" \
+  || die "matchbox bootstrap fast-path does not require selected-app-surface.json"
+grep -Fq 'systemctl restart ourbox-mdns-aliases.service ourbox-status.service' "${BOOTSTRAP_SCRIPT}" \
+  || die "matchbox bootstrap does not restart runtime surface consumers after render"
 
 set +e
 library_exec_output="$(OURBOX_INSTALL_LIBRARY_ONLY=1 bash "${INSTALLER_SCRIPT}" 2>&1)"

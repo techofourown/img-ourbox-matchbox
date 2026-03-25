@@ -336,7 +336,10 @@ if not isinstance(resolved, dict) or not resolved:
 
 selected_os = resolved.get("os") or {}
 selected_substrate = resolved.get("selected_substrate") or {}
-selected_applications = resolved.get("applications") or {}
+selected_applications = resolved.get("applications")
+
+if not isinstance(selected_applications, dict) or not selected_applications:
+    raise SystemExit("mission resolved.applications must be present")
 
 catalog_relpath = str(selected_applications.get("catalog_relpath", "")).strip()
 images_lock_relpath = str(selected_applications.get("images_lock_relpath", "")).strip()
