@@ -15,7 +15,6 @@ die() {
 # (excluding images.lock.json which is now generated at build time),
 # and the workload manifests that were absent from the older two-file contract.
 required_paths=(
-  "contract.env"
   "tools/check-target-prereqs.sh"
   "tools/contract-identity.sh"
   "tools/render-contract.py"

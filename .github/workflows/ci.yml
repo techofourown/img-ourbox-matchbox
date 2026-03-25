@@ -44,8 +44,8 @@ jobs:
           adapter = json.loads(Path("tools/media-adapter/adapter.json").read_text(encoding="utf-8"))
           if adapter.get("target_id") != "matchbox":
               raise SystemExit("tools/media-adapter/adapter.json must declare target_id=matchbox")
-          if adapter.get("airgap_selection_model") != "published-airgap-bundle":
-              raise SystemExit("tools/media-adapter/adapter.json must declare airgap_selection_model=published-airgap-bundle")
+          if adapter.get("substrate_selection_model") != "published-substrate-bundle":
+              raise SystemExit("tools/media-adapter/adapter.json must declare substrate_selection_model=published-substrate-bundle")
           PY
 
       - name: Check shell syntax (bash -n)

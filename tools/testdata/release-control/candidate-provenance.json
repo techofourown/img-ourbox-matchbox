@@ -25,7 +25,6 @@
         "target": "rpi",
         "sku": "TOO-OBX-MBX-BASE-001",
         "git_sha": "2def83dc4250",
-        "platform_contract_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
         "k3s_version": "v1.35.0+k3s1"
       },
       "meta_env": {
@@ -39,11 +38,6 @@
         "OURBOX_SKU": "TOO-OBX-MBX-BASE-001",
         "BUILD_TS": "2026-03-09T04:40:10Z",
         "GIT_SHA": "2def83dc4250",
-        "OURBOX_PLATFORM_CONTRACT_DIGEST": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-        "OURBOX_PLATFORM_CONTRACT_SOURCE": "https://github.com/techofourown/sw-ourbox-os",
-        "OURBOX_PLATFORM_CONTRACT_REVISION": "93e087a671428ee9e87688d039a8715abea735a7",
-        "OURBOX_PLATFORM_CONTRACT_VERSION": "v0.10.1",
-        "OURBOX_PLATFORM_CONTRACT_CREATED": "2026-03-08T14:00:05Z",
         "K3S_VERSION": "v1.35.0+k3s1",
         "GITHUB_WORKFLOW": "Official Candidate Build & Publish (Matchbox)",
         "GITHUB_RUN_ID": "22837315282",

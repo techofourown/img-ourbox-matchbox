@@ -54,7 +54,7 @@ DATA_CHECK_MP="${OURBOX_INSTALL_DATA_CHECK_MP:-/run/ourbox-installer/data-check}
 SYS_BOOT_MP="${OURBOX_INSTALL_SYS_BOOT_MP:-/run/ourbox-installer/sys-boot}"
 SYS_ROOT_MP="${OURBOX_INSTALL_SYS_ROOT_MP:-/run/ourbox-installer/sys-root}"
 MISSION_ROOT="${OURBOX_INSTALL_MISSION_ROOT:-/opt/ourbox/mission}"
-AIRGAP_EXTRACT_DIR="${OURBOX_INSTALL_AIRGAP_EXTRACT_DIR:-/opt/ourbox/installer/cache/ourbox-substrate}"
+SUBSTRATE_EXTRACT_DIR="${OURBOX_INSTALL_SUBSTRATE_EXTRACT_DIR:-/opt/ourbox/installer/cache/ourbox-substrate}"
 DEFAULTS_ENV="${OURBOX_INSTALL_DEFAULTS_ENV:-/opt/ourbox/installer/defaults.env}"
 
 INSTALLER_ID=""
@@ -70,8 +70,6 @@ PAYLOAD_SHA256=""
 PAYLOAD_META=""
 INSTALL_SELECTION_SOURCE=""
 RELEASE_CHANNEL=""
-PLATFORM_CONTRACT_DIGEST=""
-
 OURBOX_SUBSTRATE_SOURCE=""
 OURBOX_SUBSTRATE_REVISION=""
 OURBOX_SUBSTRATE_VERSION=""
@@ -85,7 +83,7 @@ OURBOX_SUBSTRATE_REF=""
 OURBOX_SUBSTRATE_DIGEST=""
 OURBOX_SUBSTRATE_SELECTION_SOURCE=""
 OURBOX_SUBSTRATE_RELEASE_CHANNEL=""
-AIRGAP_MANIFEST_PATH=""
+SUBSTRATE_MANIFEST_PATH=""
 
 IDENTITY_USERNAME="ourbox"
 IDENTITY_PASSWORD_HASH=""
@@ -106,7 +104,7 @@ cleanup_mounts() {
 }
 
 cleanup_temp() {
-  rm -rf "${AIRGAP_EXTRACT_DIR}"
+  rm -rf "${SUBSTRATE_EXTRACT_DIR}"
 }
 
 finalize() {
@@ -213,14 +211,13 @@ show_install_plan() {
   fi
   echo "  Digest      : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  Payload SHA : ${PAYLOAD_SHA256}"
-  echo "  Apps bundle : ${OURBOX_SUBSTRATE_REF:-unknown}"
-  echo "  Apps source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
-  echo "  Apps select : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  echo "  Substrate   : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Sub source  : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Sub select  : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
   if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
-    echo "  Apps lane   : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
+    echo "  Sub lane    : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Apps digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
-  echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
+  echo "  Sub digest  : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   if [[ "${MATCHBOX_SYSTEM_DISK_WAS_DATA}" == "1" ]]; then
     echo "  Note        : selected SYSTEM disk currently carries OURBOX_DATA and will be cleared"
@@ -240,14 +237,13 @@ show_completion_summary() {
   fi
   echo "  Digest      : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  Payload SHA : ${PAYLOAD_SHA256}"
-  echo "  Apps bundle : ${OURBOX_SUBSTRATE_REF:-unknown}"
-  echo "  Apps source : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
-  echo "  Apps select : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  echo "  Substrate   : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Sub source  : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Sub select  : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
   if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
-    echo "  Apps lane   : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
+    echo "  Sub lane    : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Apps digest : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
-  echo "  Contract    : ${PLATFORM_CONTRACT_DIGEST:-unknown}"
+  echo "  Sub digest  : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   echo "  Username    : ${IDENTITY_USERNAME}"
   echo
 }
@@ -336,8 +332,7 @@ if not isinstance(resolved, dict) or not resolved:
     raise SystemExit("mission-manifest.json must include a resolved object")
 
 selected_os = resolved.get("os") or {}
-selected_airgap = resolved.get("airgap") or {}
-platform_contract = manifest.get("platform_contract") or {}
+selected_substrate = resolved.get("selected_substrate") or {}
 
 values = [
     str(selected_os.get("selection_source", "")).strip(),
@@ -346,13 +341,12 @@ values = [
     str(selected_os.get("artifact_digest", "")).strip(),
     str((selected_os.get("payload") or {}).get("relpath", "")).strip(),
     str(selected_os.get("metadata_relpath", "")).strip(),
-    str(platform_contract.get("digest", "")).strip(),
-    str(selected_airgap.get("selection_source", "")).strip(),
-    str(selected_airgap.get("release_channel", "")).strip(),
-    str(selected_airgap.get("artifact_ref", "")).strip(),
-    str(selected_airgap.get("artifact_digest", "")).strip(),
-    str(selected_airgap.get("payload_relpath", "")).strip(),
-    str(selected_airgap.get("manifest_relpath", "")).strip(),
+    str(selected_substrate.get("selection_source", "")).strip(),
+    str(selected_substrate.get("release_channel", "")).strip(),
+    str(selected_substrate.get("artifact_ref", "")).strip(),
+    str(selected_substrate.get("artifact_digest", "")).strip(),
+    str(selected_substrate.get("payload_relpath", "")).strip(),
+    str(selected_substrate.get("manifest_relpath", "")).strip(),
 ]
 print("\n".join(values))
 PY
@@ -360,7 +354,7 @@ PY
 
   local mission_fields=()
   mapfile -t mission_fields <<<"${mission_dump}"
-  [[ "${#mission_fields[@]}" -eq 13 ]] || die "mission-manifest.json parse produced an unexpected field set"
+  [[ "${#mission_fields[@]}" -eq 12 ]] || die "mission-manifest.json parse produced an unexpected field set"
 
   INSTALL_SELECTION_SOURCE="${mission_fields[0]}"
   RELEASE_CHANNEL="${mission_fields[1]}"
@@ -368,20 +362,18 @@ PY
   OS_ARTIFACT_DIGEST="${mission_fields[3]}"
   PAYLOAD_PATH="$(resolve_mission_relpath "mission OS payload relpath" "${mission_fields[4]}")"
   PAYLOAD_META="$(resolve_mission_relpath "mission OS metadata relpath" "${mission_fields[5]}")"
-  PLATFORM_CONTRACT_DIGEST="${mission_fields[6]}"
-  OURBOX_SUBSTRATE_SELECTION_SOURCE="${mission_fields[7]}"
-  OURBOX_SUBSTRATE_RELEASE_CHANNEL="${mission_fields[8]}"
-  OURBOX_SUBSTRATE_REF="${mission_fields[9]}"
-  OURBOX_SUBSTRATE_DIGEST="${mission_fields[10]}"
-  local airgap_payload=""
-  airgap_payload="$(resolve_mission_relpath "mission application bundle relpath" "${mission_fields[11]}")"
-  AIRGAP_MANIFEST_PATH="$(resolve_mission_relpath "mission application bundle manifest relpath" "${mission_fields[12]}")"
+  OURBOX_SUBSTRATE_SELECTION_SOURCE="${mission_fields[6]}"
+  OURBOX_SUBSTRATE_RELEASE_CHANNEL="${mission_fields[7]}"
+  OURBOX_SUBSTRATE_REF="${mission_fields[8]}"
+  OURBOX_SUBSTRATE_DIGEST="${mission_fields[9]}"
+  local substrate_payload=""
+  substrate_payload="$(resolve_mission_relpath "mission substrate bundle relpath" "${mission_fields[10]}")"
+  SUBSTRATE_MANIFEST_PATH="$(resolve_mission_relpath "mission substrate bundle manifest relpath" "${mission_fields[11]}")"
 
   [[ -f "${PAYLOAD_PATH}" ]] || die "mission OS payload missing: ${PAYLOAD_PATH}"
   [[ -f "${PAYLOAD_META}" ]] || die "mission OS metadata missing: ${PAYLOAD_META}"
-  [[ -f "${airgap_payload}" ]] || die "mission application bundle missing: ${airgap_payload}"
-  [[ -f "${AIRGAP_MANIFEST_PATH}" ]] || die "mission application bundle manifest missing: ${AIRGAP_MANIFEST_PATH}"
-  [[ "${PLATFORM_CONTRACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "mission platform contract digest is invalid"
+  [[ -f "${substrate_payload}" ]] || die "mission substrate bundle missing: ${substrate_payload}"
+  [[ -f "${SUBSTRATE_MANIFEST_PATH}" ]] || die "mission substrate bundle manifest missing: ${SUBSTRATE_MANIFEST_PATH}"
 
   local payload_sha_file="${PAYLOAD_PATH}.sha256"
   [[ -f "${payload_sha_file}" ]] || die "mission OS payload checksum missing: ${payload_sha_file}"
@@ -394,33 +386,29 @@ PY
 
   # shellcheck disable=SC1090
   source "${PAYLOAD_META}"
-  [[ "${OURBOX_PLATFORM_CONTRACT_DIGEST:-}" == "${PLATFORM_CONTRACT_DIGEST}" ]] \
-    || die "mission OS metadata contract digest mismatch"
 
-  rm -rf "${AIRGAP_EXTRACT_DIR}"
-  mkdir -p "${AIRGAP_EXTRACT_DIR}"
-  tar -xzf "${airgap_payload}" -C "${AIRGAP_EXTRACT_DIR}"
+  rm -rf "${SUBSTRATE_EXTRACT_DIR}"
+  mkdir -p "${SUBSTRATE_EXTRACT_DIR}"
+  tar -xzf "${substrate_payload}" -C "${SUBSTRATE_EXTRACT_DIR}"
 
-  [[ -f "${AIRGAP_EXTRACT_DIR}/manifest.env" ]] || die "mission application bundle extract is missing manifest.env"
-  [[ -x "${AIRGAP_EXTRACT_DIR}/k3s/k3s" ]] || die "mission application bundle extract is missing k3s/k3s"
-  [[ -f "${AIRGAP_EXTRACT_DIR}/k3s/k3s-airgap-images-arm64.tar" ]] \
-    || die "mission application bundle extract is missing k3s/k3s-airgap-images-arm64.tar"
-  [[ -f "${AIRGAP_EXTRACT_DIR}/platform/images.lock.json" ]] \
-    || die "mission application bundle extract is missing platform/images.lock.json"
-  [[ -f "${AIRGAP_EXTRACT_DIR}/platform/profile.env" ]] \
-    || die "mission application bundle extract is missing platform/profile.env"
-  find "${AIRGAP_EXTRACT_DIR}/platform/images" -maxdepth 1 -type f -name '*.tar' | grep -q . \
-    || die "mission application bundle extract is missing platform image tars"
+  [[ -f "${SUBSTRATE_EXTRACT_DIR}/manifest.env" ]] || die "mission substrate bundle extract is missing manifest.env"
+  [[ -x "${SUBSTRATE_EXTRACT_DIR}/k3s/k3s" ]] || die "mission substrate bundle extract is missing k3s/k3s"
+  [[ -f "${SUBSTRATE_EXTRACT_DIR}/k3s/k3s-images-arm64.tar" ]] \
+    || die "mission substrate bundle extract is missing k3s/k3s-images-arm64.tar"
+  [[ -f "${SUBSTRATE_EXTRACT_DIR}/platform/images.lock.json" ]] \
+    || die "mission substrate bundle extract is missing platform/images.lock.json"
+  [[ -f "${SUBSTRATE_EXTRACT_DIR}/platform/profile.env" ]] \
+    || die "mission substrate bundle extract is missing platform/profile.env"
+  find "${SUBSTRATE_EXTRACT_DIR}/platform/images" -maxdepth 1 -type f -name '*.tar' | grep -q . \
+    || die "mission substrate bundle extract is missing platform image tars"
 
-  cmp -s "${AIRGAP_EXTRACT_DIR}/manifest.env" "${AIRGAP_MANIFEST_PATH}" \
-    || die "mission application bundle manifest does not match tarball manifest.env"
+  cmp -s "${SUBSTRATE_EXTRACT_DIR}/manifest.env" "${SUBSTRATE_MANIFEST_PATH}" \
+    || die "mission substrate bundle manifest does not match tarball manifest.env"
 
   # shellcheck disable=SC1090
-  source "${AIRGAP_MANIFEST_PATH}"
-  [[ "${OURBOX_PLATFORM_CONTRACT_DIGEST:-}" == "${PLATFORM_CONTRACT_DIGEST}" ]] \
-    || die "mission application bundle contract digest mismatch"
+  source "${SUBSTRATE_MANIFEST_PATH}"
   [[ "${OURBOX_SUBSTRATE_ARCH:-}" == "arm64" ]] \
-    || die "mission application bundle arch mismatch: expected arm64, got ${OURBOX_SUBSTRATE_ARCH:-unknown}"
+    || die "mission substrate bundle arch mismatch: expected arm64, got ${OURBOX_SUBSTRATE_ARCH:-unknown}"
 
   OURBOX_SUBSTRATE_SOURCE="${OURBOX_SUBSTRATE_SOURCE:-unknown}"
   OURBOX_SUBSTRATE_REVISION="${OURBOX_SUBSTRATE_REVISION:-unknown}"
@@ -447,7 +435,7 @@ show_payload_metadata() {
 
 show_ourbox_substrate_metadata() {
   echo
-  echo "Application bundle:"
+  echo "Substrate bundle:"
   echo "  Selection source: ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
   if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
     echo "  Release channel : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
@@ -477,17 +465,17 @@ teardown_installer_ssh() {
 }
 
 overlay_selected_ourbox_substrate_into_mounted_root() {
-  local target_airgap="${SYS_ROOT_MP}/opt/ourbox/airgap"
-  local target_platform="${target_airgap}/platform"
+  local target_substrate="${SYS_ROOT_MP}/opt/ourbox/substrate"
+  local target_platform="${target_substrate}/platform"
 
-  install -d -m 0755 "${target_airgap}" "${target_platform}"
-  rm -rf "${target_airgap}/k3s" "${target_platform}/images"
-  cp -a "${AIRGAP_EXTRACT_DIR}/k3s" "${target_airgap}/k3s"
-  cp -a "${AIRGAP_EXTRACT_DIR}/platform/images" "${target_platform}/images"
-  cp -f "${AIRGAP_EXTRACT_DIR}/platform/images.lock.json" "${target_platform}/images.lock.json"
-  cp -f "${AIRGAP_EXTRACT_DIR}/platform/profile.env" "${target_platform}/profile.env"
-  cp -f "${AIRGAP_EXTRACT_DIR}/manifest.env" "${target_airgap}/manifest.env"
-  log "Applied staged application bundle into installed rootfs"
+  install -d -m 0755 "${target_substrate}" "${target_platform}"
+  rm -rf "${target_substrate}/k3s" "${target_platform}/images"
+  cp -a "${SUBSTRATE_EXTRACT_DIR}/k3s" "${target_substrate}/k3s"
+  cp -a "${SUBSTRATE_EXTRACT_DIR}/platform/images" "${target_platform}/images"
+  cp -f "${SUBSTRATE_EXTRACT_DIR}/platform/images.lock.json" "${target_platform}/images.lock.json"
+  cp -f "${SUBSTRATE_EXTRACT_DIR}/platform/profile.env" "${target_platform}/profile.env"
+  cp -f "${SUBSTRATE_EXTRACT_DIR}/manifest.env" "${target_substrate}/manifest.env"
+  log "Applied staged substrate bundle into installed rootfs"
 }
 
 write_install_provenance() {
