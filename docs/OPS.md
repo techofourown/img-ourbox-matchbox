@@ -162,9 +162,6 @@ Look first for the `OURBOX_SUBSTRATE_*` keys:
 - `OURBOX_SUBSTRATE_PROFILE`
 - `OURBOX_SUBSTRATE_K3S_VERSION`
 
-Older builds may still carry `OURBOX_PLATFORM_CONTRACT_*` fields. Treat those as
-informational trace only, not as compatibility gates.
-
 This is the provenance boundary that keeps the official baseline legible even
 before signatures or attestations exist.
 
