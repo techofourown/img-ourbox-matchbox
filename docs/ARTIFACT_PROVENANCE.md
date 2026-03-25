@@ -12,7 +12,7 @@ and
 | Artifact | Description |
 |---|---|
 | OS image | Bootable NVMe OS image for Raspberry Pi 5 + dual NVMe (`.img.xz` + SHA-256 checksum + metadata) |
-| Installer media | Bootable installer that writes the OS image to NVMe (`.img.xz` + SHA-256 checksum + metadata) |
+| Installer substrate | Bootable installer substrate used as the base for host-composed Matchbox mission media (`.img.xz` + SHA-256 checksum + metadata) |
 
 Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
 
@@ -135,17 +135,23 @@ Every published artifact carries the following provenance in its OCI annotations
 | `techofourown.target` | `rpi` |
 | `techofourown.variant` | `prod` |
 | `techofourown.sku` | `TOO-OBX-MBX-BASE-001` |
-| `techofourown.platform-contract.digest` | Digest of `platform-contract` bundle baked in |
 | `techofourown.build.workflow` | GitHub workflow name |
 | `techofourown.build.run-id` | GitHub run ID |
 | `techofourown.build.run-attempt` | GitHub run attempt |
 
 Additional metadata is published as artifact files:
 
-- `os.meta.env` / `installer.meta.env` — full provenance record including K3S version, upstream contract source/revision/version/digest, image SHA-256, and size
-- `os.meta.json` / `installer.meta.json` — JSON form of the same flat metadata map for machine-readable consumption
+- `os.meta.env` / `installer.meta.env` — full provenance record including
+  substrate ref/digest/source/revision/version/profile, K3S version, image
+  SHA-256, and size
+- `os.meta.json` / `installer.meta.json` — JSON form of the same flat metadata
+  map for machine-readable consumption
 - `os.img.xz.sha256` / `installer.img.xz.sha256` — SHA-256 checksum for offline verification
 - `os.info` / `installer.info` — pi-gen build info (if present)
+
+Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still appear in some
+artifact-carried metadata while the remaining cleanup lands. They are
+informational only and not compatibility gates.
 
 Canonical artifact identity for consumption is **by digest** (e.g., `ghcr.io/techofourown/ourbox-matchbox-os@sha256:...`).
 
@@ -176,6 +182,10 @@ At workflow start, the official candidate build resolves that approved snapshot
 into exact digest-pinned refs for `PLATFORM_CONTRACT_REF` and
 `OURBOX_SUBSTRATE_REF`. Those resolved immutable identities are then recorded in
 workflow provenance and artifact metadata.
+
+Runtime and installer compatibility are then enforced by exact selected artifact
+identity, bundle-shape validation, and required runtime capabilities, not by
+matching copied platform-contract metadata fields.
 
 The scheduled nightly integration build intentionally bypasses the approved
 snapshot and resolves the latest upstream `edge` digests at workflow time.

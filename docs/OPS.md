@@ -1,6 +1,6 @@
 # OurBox Matchbox OS — Operator Runbook (Zero → Boot)
 
-**Last verified:** 2026-02-27 (re-verify after airgap bundle migration)  
+**Last verified:** 2026-02-27 (re-verify after substrate bundle migration)  
 **Verified on:** Pi 5 + dual NVMe (DATA label `OURBOX_DATA`, SYSTEM flashed to other NVMe)  
 **Outcome:** k3s + hello workload running, nginx reachable on `127.0.0.1:30080`
 
@@ -138,14 +138,14 @@ sudo cat /var/lib/ourbox/state/bootstrap.done 2>/dev/null || true
 
 ---
 
-## Platform contract provenance (what baseline did this image ship?)
+## Platform input provenance (what baseline did this image ship?)
 
-This image repo is responsible for "boot + bootstrap," but the *platform contract* (baseline
-manifests / platform components contract) is sourced from `sw-ourbox-os`.
+This image repo is responsible for boot plus bootstrap, but the upstream
+platform payload comes from `sw-ourbox-os`.
 
 When debugging a device, the first question is:
 
-> "What platform contract revision/digest am I running?"
+> "What exact substrate and platform payload did this image ship?"
 
 Check:
 
@@ -153,14 +153,20 @@ Check:
 sudo cat /etc/ourbox/release
 ```
 
-Look for the `OURBOX_PLATFORM_CONTRACT_*` keys:
-- `OURBOX_PLATFORM_CONTRACT_SOURCE`
-- `OURBOX_PLATFORM_CONTRACT_REVISION`
-- (when available) `OURBOX_PLATFORM_CONTRACT_VERSION`
-- (when available) `OURBOX_PLATFORM_CONTRACT_DIGEST`
+Look first for the `OURBOX_SUBSTRATE_*` keys:
+- `OURBOX_SUBSTRATE_REF`
+- `OURBOX_SUBSTRATE_DIGEST`
+- `OURBOX_SUBSTRATE_SOURCE`
+- `OURBOX_SUBSTRATE_REVISION`
+- `OURBOX_SUBSTRATE_ARCH`
+- `OURBOX_SUBSTRATE_PROFILE`
+- `OURBOX_SUBSTRATE_K3S_VERSION`
 
-This is the provenance boundary that keeps "official baseline" legible even before we enforce
-signatures.
+Older builds may still carry `OURBOX_PLATFORM_CONTRACT_*` fields. Treat those as
+informational trace only, not as compatibility gates.
+
+This is the provenance boundary that keeps the official baseline legible even
+before signatures or attestations exist.
 
 ---
 

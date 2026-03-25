@@ -1,5 +1,11 @@
 # ADR-0004: Consume the OurBox OS Platform Contract from `sw-ourbox-os`
 
+> Status note (2026-03): Matchbox now consumes both `platform-contract` and
+> `ourbox-substrate` as pinned OCI inputs from `sw-ourbox-os`. Legacy
+> platform-contract metadata may still appear in provenance, but compatibility
+> is enforced by exact selected artifact identities plus local bundle and
+> capability checks, not by contract-digest matching.
+
 
 ## Context
 
@@ -9,7 +15,7 @@ It is responsible for:
 - bootability + base OS configuration
 - disk/storage contract enforcement
 - first-boot bootstrap services (k3s bring-up, applying baseline manifests, etc.)
-- airgap/offline friendliness
+- offline friendliness
 
 Historically, image repos often become the accidental "home" of the platform baseline (the manifests
 and components that make the box feel like an appliance). That creates drift and makes it easy for
@@ -40,7 +46,7 @@ Canonical upstream docs:
 ### 2) Phase 0 allowance (vendored baseline is permitted, but must be traceable)
 
 Until the platform contract is packaged and consumed as an OCI artifact by digest, this repo MAY
-vendor a copy of the baseline manifests (e.g., as part of airgap platform content).
+vendor a copy of the baseline manifests (e.g., as part of staged substrate/platform content).
 
 However:
 - Vendored baseline content MUST be traceable to a specific `sw-ourbox-os` revision (and ideally a version).
@@ -48,21 +54,20 @@ However:
 
 ### 3) Provenance is mandatory
 
-The installed system MUST record platform contract provenance in `/etc/ourbox/release` so operators
-can answer "what platform baseline is running?" locally.
+The installed system MUST record enough upstream provenance in
+`/etc/ourbox/release` so operators can answer what platform baseline is running
+locally.
 
-Required keys (Phase 0+):
-- `OURBOX_PLATFORM_CONTRACT_SOURCE` (repo URL or canonical identity)
-- `OURBOX_PLATFORM_CONTRACT_REVISION` (git SHA of `sw-ourbox-os`)
+Required current provenance centers on exact selected artifact identity and
+substrate provenance. Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still be
+recorded for traceability, but they are not compatibility gates.
 
-Optional keys (when available):
-- `OURBOX_PLATFORM_CONTRACT_VERSION` (e.g., `v0.8.0`)
-- `OURBOX_PLATFORM_CONTRACT_DIGEST` (OCI digest, `sha256:...`)
+### 4) Current runtime posture
 
-### 4) Future intent
-
-When `sw-ourbox-os` publishes the platform contract as an OCI artifact, this repo SHOULD move to
-consuming it by digest (build-time embed or first-boot fetch), per the upstream plan.
+This repo now consumes pinned upstream artifacts during build. Matchbox runtime
+then validates shipped files and helper capabilities locally. The intended
+compatibility rule is exact selected bytes plus local shape and capability
+checks, not copied contract-digest parity.
 
 ## Rationale
 

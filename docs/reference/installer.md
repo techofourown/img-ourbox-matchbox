@@ -24,8 +24,8 @@ The mission manifest and the staged mission artifacts under `/opt/ourbox/mission
 are the authoritative source for:
 
 - which Matchbox OS payload will be installed
-- which arm64 application bundle will be applied into the installed rootfs
-- which platform contract digest bounds that mission
+- which selected `ourbox-substrate` bundle and staged mission bytes will be
+  applied into the installed rootfs
 
 There is no runtime boot-media override for payload selection.
 
@@ -36,11 +36,11 @@ There is no runtime boot-media override for payload selection.
 - Installer logs its operator-visible flow to `/run/ourbox-installer.log` in addition to `tty1`,
   so support media can inspect the same transcript over SSH.
 - Installer validates the embedded mission locally before any destructive work:
-  - mission manifest contract shape and target id
+  - mission manifest shape and target id
   - staged OS payload bytes and checksum
-  - staged OS metadata contract digest
-  - staged application-bundle tarball shape
-  - staged application-bundle manifest contract digest and arch
+  - staged OS metadata shape
+  - staged selected-substrate tarball shape and checksum
+  - staged selected-substrate manifest shape, pinned ref, digest, and arch
 - Matchbox now follows a four-step installer flow:
   1. load and verify the local mission
   2. review the SYSTEM/DATA storage plan
@@ -54,7 +54,7 @@ There is no runtime boot-media override for payload selection.
   `ERASE-DATA`, or `KEEP-DATA` during planning and applies the chosen action only after the final
   `INSTALL` confirmation.
 - `KEEP-DATA` preserves existing DATA contents; bootstrap re-runs automatically on next boot only
-  when the shipped contract state changed.
+  when the shipped platform state changed.
 - Matchbox no longer requires the operator to type the raw SYSTEM disk path or `FLASH`;
   destructive work starts only after the final `INSTALL` confirmation step.
 - After flashing, the installer writes `userconf.txt`, overlays the staged application bundle into
@@ -106,6 +106,6 @@ Host-composed Matchbox mission media is built later by `sw-ourbox-installer`, wh
 
 - chooses the target
 - resolves the exact Matchbox OS artifact on the host
-- resolves the exact arm64 application bundle on the host
+- resolves the exact selected substrate and mission payload on the host
 - stages the mission manifest and mission artifacts
 - embeds that mission into the published Matchbox installer substrate

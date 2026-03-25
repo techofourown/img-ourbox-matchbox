@@ -3,7 +3,7 @@
 Build repository for **OurBox Matchbox** OS images and installer substrate targeting
 **Raspberry Pi hardware** (Pi 5 + dual NVMe, Matchbox-class hardware).
 
-This repo produces an NVMe-bootable OS that mounts `/var/lib/ourbox` and boots into an airgapped
+This repo produces an NVMe-bootable OS that mounts `/var/lib/ourbox` and boots into an offline
 single-node k3s runtime via `ourbox-bootstrap`.
 
 Installer and maintainer flash flows now use the same storage-role logic:
@@ -23,7 +23,7 @@ Model identifies the physical hardware class; SKU identifies the exact bill-of-m
 ## Docs
 
 - Upstream platform producer: [`sw-ourbox-os`](https://github.com/techofourown/sw-ourbox-os)
-- Platform contract consumption: [`docs/reference/platform-contract.md`](./docs/reference/platform-contract.md)
+- Platform input consumption: [`docs/reference/platform-contract.md`](./docs/reference/platform-contract.md)
 - Operator runbook: [`docs/OPS.md`](./docs/OPS.md)
 - Contracts reference: [`docs/reference/contracts.md`](./docs/reference/contracts.md)
 
@@ -62,7 +62,7 @@ The wrapper delegates to `sw-ourbox-installer`, which:
 
 - selects the Matchbox target
 - resolves the chosen OS payload on the host
-- resolves the chosen arm64 application bundle on the host
+- resolves the chosen substrate and mission payload on the host
 - stages a local mission directory
 - embeds that mission into the published Matchbox installer substrate
 - flashes the composed mission media to your selected removable/USB device
