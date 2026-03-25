@@ -43,10 +43,6 @@ Line-oriented `KEY=VALUE` pairs (shell-friendly). Example keys:
 - `OURBOX_INSTALL_SELECTION_SOURCE`
 - `OURBOX_RELEASE_CHANNEL`
 
-Legacy `OURBOX_PLATFORM_CONTRACT_*` keys may still appear on systems built from
-older payloads or transitional branches, but they are not the normative
-compatibility surface.
-
 ### Platform input provenance (normative)
 
 Matchbox images MUST record enough upstream provenance for operators to answer:
@@ -66,9 +62,6 @@ Additional fields such as `OURBOX_SUBSTRATE_VERSION`,
 `OURBOX_SUBSTRATE_CREATED`, `OURBOX_SUBSTRATE_PROFILE`,
 `OURBOX_SUBSTRATE_K3S_VERSION`, and
 `OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256` should be recorded when available.
-
-If legacy `OURBOX_PLATFORM_CONTRACT_*` fields are present, treat them as trace
-only. Do not use them as selection or compatibility gates.
 
 See `docs/reference/platform-contract.md` for the full platform-input model.
 

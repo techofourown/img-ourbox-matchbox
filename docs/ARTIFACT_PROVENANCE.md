@@ -149,10 +149,6 @@ Additional metadata is published as artifact files:
 - `os.img.xz.sha256` / `installer.img.xz.sha256` — SHA-256 checksum for offline verification
 - `os.info` / `installer.info` — pi-gen build info (if present)
 
-Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still appear in some
-artifact-carried metadata while the remaining cleanup lands. They are
-informational only and not compatibility gates.
-
 Canonical artifact identity for consumption is **by digest** (e.g., `ghcr.io/techofourown/ourbox-matchbox-os@sha256:...`).
 
 Promotion workflows do not rewrite the artifact payload or its embedded metadata. Stable and

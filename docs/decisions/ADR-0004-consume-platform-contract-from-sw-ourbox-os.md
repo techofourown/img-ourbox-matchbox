@@ -1,9 +1,8 @@
 # ADR-0004: Consume the OurBox OS Platform Contract from `sw-ourbox-os`
 
 > Status note (2026-03): Matchbox now consumes both `platform-contract` and
-> `ourbox-substrate` as pinned OCI inputs from `sw-ourbox-os`. Legacy
-> platform-contract metadata may still appear in provenance, but compatibility
-> is enforced by exact selected artifact identities plus local bundle and
+> `ourbox-substrate` as pinned OCI inputs from `sw-ourbox-os`. Compatibility is
+> enforced by exact selected artifact identities plus local bundle and
 > capability checks, not by contract-digest matching.
 
 
@@ -59,8 +58,8 @@ The installed system MUST record enough upstream provenance in
 locally.
 
 Required current provenance centers on exact selected artifact identity and
-substrate provenance. Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still be
-recorded for traceability, but they are not compatibility gates.
+substrate provenance. Obsolete copied platform-contract metadata fields are not
+part of the current provenance contract.
 
 ### 4) Current runtime posture
 
