@@ -287,7 +287,6 @@ def validate_publish_record(record: Any, *, expected_role: str | None = None) ->
     ensure_known_string(control_fields.get("sku"), "control_fields.sku")
     ensure_short_sha(control_fields.get("git_sha"), "control_fields.git_sha")
     if role == "os":
-        ensure_digest(control_fields.get("platform_contract_digest"), "control_fields.platform_contract_digest")
         ensure_known_string(control_fields.get("k3s_version"), "control_fields.k3s_version")
     meta_env = validate_flat_string_map(record.get("meta_env"), "meta_env")
 
@@ -400,7 +399,6 @@ def build_os_catalog_header(sha_column: str) -> str:
             "target",
             "sku",
             "git_sha",
-            "platform_contract_digest",
             "k3s_version",
             sha_column,
             "artifact_digest",
@@ -418,7 +416,6 @@ def build_substrate_catalog_header() -> str:
             "version",
             "revision",
             "arch",
-            "platform_contract_digest",
             "platform_profile",
             "k3s_version",
             "platform_images_lock_sha256",
@@ -496,11 +493,6 @@ def validate_upstream_substrate_publish_record(record: Any) -> dict[str, Any]:
         input_metadata.get("OURBOX_PLATFORM_IMAGES_LOCK_SHA256"),
         "input_metadata.OURBOX_PLATFORM_IMAGES_LOCK_SHA256",
     )
-    ensure_digest(
-        input_metadata.get("OURBOX_PLATFORM_CONTRACT_DIGEST"),
-        "input_metadata.OURBOX_PLATFORM_CONTRACT_DIGEST",
-    )
-
     return record
 
 
@@ -556,7 +548,6 @@ def update_os_catalog_from_record(
                     control["target"],
                     control["sku"],
                     control["git_sha"],
-                    control.get("platform_contract_digest", ""),
                     control.get("k3s_version", ""),
                     payload_sha256,
                     immutable_digest,
@@ -621,7 +612,6 @@ def update_substrate_catalog_from_record(
                     version,
                     record["source_commit"],
                     artifact_metadata["OURBOX_SUBSTRATE_ARCH"],
-                    input_metadata["OURBOX_PLATFORM_CONTRACT_DIGEST"],
                     input_metadata["OURBOX_PLATFORM_PROFILE"],
                     input_metadata["K3S_VERSION"],
                     input_metadata["OURBOX_PLATFORM_IMAGES_LOCK_SHA256"],

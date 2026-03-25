@@ -240,9 +240,9 @@ main() {
   log "Fetching ourbox-substrate artifacts"
   "${ROOT}/tools/fetch-ourbox-substrate.sh"
 
-  if [[ -f "${ROOT}/artifacts/airgap/manifest.env" ]]; then
+  if [[ -f "${ROOT}/artifacts/substrate/manifest.env" ]]; then
     # shellcheck disable=SC1090,SC1091
-    source "${ROOT}/artifacts/airgap/manifest.env"
+    source "${ROOT}/artifacts/substrate/manifest.env"
     log "Substrate pins: ARCH=${OURBOX_SUBSTRATE_ARCH:-?} K3S_VERSION=${K3S_VERSION:-?}"
   fi
 

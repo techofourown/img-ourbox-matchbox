@@ -150,10 +150,6 @@
               "type": "string",
               "pattern": "^[0-9a-f]{12}$"
             },
-            "platform_contract_digest": {
-              "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
-            },
             "k3s_version": {
               "type": "string"
             }

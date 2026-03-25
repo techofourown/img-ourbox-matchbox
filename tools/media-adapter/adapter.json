@@ -12,8 +12,8 @@
   "compose_entrypoint": "tools/media-adapter/compose-media.sh",
   "validate_entrypoint": "tools/media-adapter/validate-media.sh",
   "expected_os_artifact_type": "application/vnd.techofourown.ourbox.matchbox.os-image.v1",
-  "expected_airgap_arch": "arm64",
-  "airgap_selection_model": "published-airgap-bundle",
+  "expected_substrate_arch": "arm64",
+  "substrate_selection_model": "published-substrate-bundle",
   "installer_substrate_payload_filename": "installer.img.xz",
   "official": {
     "os_repo": "ghcr.io/techofourown/ourbox-matchbox-os",
@@ -24,9 +24,9 @@
       "nightly": "rpi-nightly",
       "exp-labs": "rpi-exp-labs"
     },
-    "airgap_bundle_repo": "ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate",
-    "airgap_bundle_catalog_tag": "catalog-arm64",
-    "airgap_bundle_channel_tags": {
+    "substrate_bundle_repo": "ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate",
+    "substrate_bundle_catalog_tag": "catalog-arm64",
+    "substrate_bundle_channel_tags": {
       "stable": "stable-arm64",
       "beta": "beta-arm64",
       "nightly": "nightly-arm64",

@@ -1,5 +1,5 @@
 [Unit]
-Description=OurBox first-boot bootstrap (airgapped)
+Description=OurBox first-boot bootstrap
 After=local-fs.target network-online.target
 Wants=network-online.target
 RequiresMountsFor=/var/lib/ourbox

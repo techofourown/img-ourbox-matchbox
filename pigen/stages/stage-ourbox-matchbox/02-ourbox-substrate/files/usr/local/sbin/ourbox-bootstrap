@@ -10,7 +10,7 @@ MARKER="${STATE_DIR}/bootstrap.done"
 APPLIED_CONTRACT_STATE="${STATE_DIR}/platform-contract.env"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 HOSTNAME="$(hostname)"
-PLATFORM_CONTRACT_DIR="/opt/ourbox/airgap/platform"
+PLATFORM_CONTRACT_DIR="/opt/ourbox/substrate/platform"
 RENDER_DIR="/run/ourbox-platform-rendered"
 DESIRED_CONTRACT_STATE=""
 PLATFORM_PROFILE_INPUT="${OURBOX_PLATFORM_PROFILE:-demo-apps}"
@@ -123,9 +123,9 @@ spec:
         hostPort: 443
 EOF_TRAEFIK
 
-log "Hydrating airgap image tars into /var/lib/ourbox/k3s/agent/images"
+log "Hydrating substrate image tars into /var/lib/ourbox/k3s/agent/images"
 shopt -s nullglob
-for tar in /opt/ourbox/airgap/k3s/*.tar /opt/ourbox/airgap/platform/images/*.tar; do
+for tar in /opt/ourbox/substrate/k3s/*.tar /opt/ourbox/substrate/platform/images/*.tar; do
   base="$(basename "${tar}")"
   dst="/var/lib/ourbox/k3s/agent/images/${base}"
   if [[ -f "${dst}" ]]; then

@@ -40,7 +40,7 @@ There is no formal test suite. Verification is manual: build, flash, boot, inspe
 
 ### Build Pipeline (ops-e2e.sh)
 1. **Bootstrap host** — install Podman + BuildKit + deps
-2. **Fetch airgap artifacts** — pull pinned `ourbox-substrate` OCI artifact (k3s binary, k3s airgap images, platform images, manifest.env) + pinned `platform-contract` → `artifacts/airgap/`, `artifacts/platform-contract/`
+2. **Fetch substrate artifacts** — pull pinned `ourbox-substrate` OCI artifact (k3s binary, k3s image tar, platform images, manifest.env) + pinned `platform-contract` → `artifacts/substrate/`, `artifacts/platform-contract/`
 3. **Build OS image** — pi-gen runs stages 0–2 (upstream) + `stage-ourbox-matchbox` (custom) → `deploy/*.img.xz`
 4. **Flash SYSTEM disk** — wipe + dd to the non-DATA NVMe (exactly 2 NVMe disks required)
 5. **Write userconf** — first-boot credentials to boot partition
@@ -49,7 +49,7 @@ There is no formal test suite. Verification is manual: build, flash, boot, inspe
 Each substage runs inside the pi-gen chroot:
 - `00-ourbox-contract` — writes `/etc/ourbox/release` (product, device, SKU, variant, version, git hash)
 - `01-storage-contract` — adds `LABEL=OURBOX_DATA` mount to `/etc/fstab` at `/var/lib/ourbox`
-- `02-ourbox-substrate` — injects k3s binary + airgap tars into the rootfs
+- `02-ourbox-substrate` — injects the substrate k3s binary + image tar payloads into the rootfs
 - `03-kernel-cgroups` — adds memory cgroup v2 flags to kernel cmdline
 
 ### Shared Shell Libraries
