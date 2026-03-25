@@ -1,3 +1,10 @@
+## [0.14.6](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.5...v0.14.6) (2026-03-25)
+
+
+### Bug Fixes
+
+* rewire platform-contract ref resolution into workflows ([26beedd](https://github.com/techofourown/img-ourbox-matchbox/commit/26beedd107365d1b7a3d2c4993d92ea9a739beb4))
+
 ## [0.14.5](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.4...v0.14.5) (2026-03-24)
 
 
