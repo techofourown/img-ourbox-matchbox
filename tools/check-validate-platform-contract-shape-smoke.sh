@@ -46,7 +46,8 @@ import sys
 if "--help" in sys.argv:
     print(
         "usage: render-contract.py [--contract-root] [--output-dir] "
-        "[--selected-apps-file] [--application-catalog] [--images-lock-file]"
+        "[--selected-apps-file] [--application-catalog] [--images-lock-file] "
+        "[--platform-images-lock-file]"
     )
     raise SystemExit(0)
 
@@ -138,7 +139,10 @@ cat > "${TOOLS_DIR}/render-contract.py" <<'EOF_BAD_RENDER'
 import sys
 
 if "--help" in sys.argv:
-    print("usage: render-contract.py [--contract-root] [--output-dir] [--selected-apps-file] [--images-lock-file]")
+    print(
+        "usage: render-contract.py [--contract-root] [--output-dir] "
+        "[--selected-apps-file] [--application-catalog] [--images-lock-file]"
+    )
     raise SystemExit(0)
 
 raise SystemExit("unexpected invocation")
@@ -150,10 +154,10 @@ status=$?
 set -e
 
 [[ "${status}" -ne 0 ]] || {
-  echo "validator should reject render-contract.py without application catalog support" >&2
+  echo "validator should reject render-contract.py without platform image lock support" >&2
   exit 1
 }
-grep -F -- "--application-catalog" "${TMP}/bad-render.log" >/dev/null || {
+grep -F -- "--platform-images-lock-file" "${TMP}/bad-render.log" >/dev/null || {
   cat "${TMP}/bad-render.log" >&2
   exit 1
 }
@@ -165,7 +169,8 @@ import sys
 if "--help" in sys.argv:
     print(
         "usage: render-contract.py [--contract-root] [--output-dir] "
-        "[--selected-apps-file] [--application-catalog] [--images-lock-file]"
+        "[--selected-apps-file] [--application-catalog] [--images-lock-file] "
+        "[--platform-images-lock-file]"
     )
     raise SystemExit(0)
 

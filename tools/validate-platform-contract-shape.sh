@@ -159,6 +159,7 @@ required_render_options=(
   "--selected-apps-file"
   "--application-catalog"
   "--images-lock-file"
+  "--platform-images-lock-file"
 )
 missing_render_options=()
 for option in "${required_render_options[@]}"; do
