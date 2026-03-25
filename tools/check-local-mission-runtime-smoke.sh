@@ -54,7 +54,7 @@ printf '#!/bin/sh\nexit 0\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
 chmod +x "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
 printf 'fixture substrate images\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s-images-arm64.tar"
 printf '{"images":[]}\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images.lock.json"
-printf 'PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
+printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
 printf 'fixture image tar\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images/platform-demo.tar"
 tar -C "${SUBSTRATE_SOURCE_DIR}" -czf "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
 cp "${SUBSTRATE_SOURCE_DIR}/manifest.env" "${MISSION_SUBSTRATE_DIR}/manifest.env"

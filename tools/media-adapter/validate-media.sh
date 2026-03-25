@@ -509,6 +509,8 @@ else:
         app_id = str(app.get("id", "")).strip()
         if not app_id:
             raise SystemExit("mission application catalog contains an app without an id")
+        if app_id in catalog_app_ids:
+            raise SystemExit(f"mission application catalog duplicates app id {app_id}")
         catalog_app_ids.add(app_id)
     unknown_app_ids = [app_id for app_id in normalized_app_ids if app_id not in catalog_app_ids]
     if unknown_app_ids:

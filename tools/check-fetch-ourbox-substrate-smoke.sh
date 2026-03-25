@@ -84,7 +84,7 @@ write_bundle() {
   : > "${BUNDLE_DIR}/k3s/k3s-images-arm64.tar"
   : > "${BUNDLE_DIR}/platform/images/app.tar"
   printf '{}\n' > "${BUNDLE_DIR}/platform/images.lock.json"
-  printf 'PROFILE=demo-apps\n' > "${BUNDLE_DIR}/platform/profile.env"
+  printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${BUNDLE_DIR}/platform/profile.env"
   cat > "${BUNDLE_DIR}/manifest.env" <<EOF
 OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=fixture-substrate-revision
