@@ -213,6 +213,7 @@ grep -Fq "MISSION_SELECTED_APPLICATIONS_PATH=${MISSION_ROOT}/artifacts/substrate
 [[ -x "${SUBSTRATE_EXTRACT_DIR}/k3s/k3s" ]] \
   || die "matchbox runtime did not extract the substrate bundle runtime"
 
+# shellcheck disable=SC2016
 env \
   OURBOX_INSTALL_LIBRARY_ONLY=1 \
   OURBOX_INSTALL_TOOLS_ROOT="${TOOLS_DIR}" \
