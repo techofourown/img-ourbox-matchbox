@@ -1,3 +1,15 @@
+## [0.14.7](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.6...v0.14.7) (2026-07-28)
+
+
+### Bug Fixes
+
+* align Matchbox substrate fixture inputs ([972ed9e](https://github.com/techofourown/img-ourbox-matchbox/commit/972ed9e8f4fcc3da9ca43a05d544f275eeb99df6))
+* harden Matchbox mission app validation ([0633392](https://github.com/techofourown/img-ourbox-matchbox/commit/0633392068e95a6d84282de33a9757ea3b1b1bd5))
+* resolve Matchbox mission app contract ([7dfdff3](https://github.com/techofourown/img-ourbox-matchbox/commit/7dfdff3689d9da449ce9daf67aa71cafe3431ccc))
+* satisfy Matchbox shell lint ([ade74fd](https://github.com/techofourown/img-ourbox-matchbox/commit/ade74fdcff9203f66d0a2de5d808bce1689f83c4))
+* split Matchbox substrate image locks ([d4b4e98](https://github.com/techofourown/img-ourbox-matchbox/commit/d4b4e9857844a3eb092aaaf9115ea1aef15274fd))
+* split Matchbox substrate image locks ([#101](https://github.com/techofourown/img-ourbox-matchbox/issues/101)) ([13c072d](https://github.com/techofourown/img-ourbox-matchbox/commit/13c072d9192a017220899ef47ccbcfe7a9e8816b))
+
 ## [0.14.6](https://github.com/techofourown/img-ourbox-matchbox/compare/v0.14.5...v0.14.6) (2026-03-25)
 
 
