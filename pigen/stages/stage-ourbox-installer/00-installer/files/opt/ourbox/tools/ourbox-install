@@ -84,6 +84,9 @@ OURBOX_SUBSTRATE_DIGEST=""
 OURBOX_SUBSTRATE_SELECTION_SOURCE=""
 OURBOX_SUBSTRATE_RELEASE_CHANNEL=""
 SUBSTRATE_MANIFEST_PATH=""
+MISSION_APPLICATION_CATALOG_PATH=""
+MISSION_APPLICATION_IMAGES_LOCK_PATH=""
+MISSION_SELECTED_APPLICATIONS_PATH=""
 
 IDENTITY_USERNAME="ourbox"
 IDENTITY_PASSWORD_HASH=""
@@ -333,6 +336,25 @@ if not isinstance(resolved, dict) or not resolved:
 
 selected_os = resolved.get("os") or {}
 selected_substrate = resolved.get("selected_substrate") or {}
+selected_applications = resolved.get("applications")
+catalog_relpath = ""
+images_lock_relpath = ""
+selection_relpath = ""
+
+if selected_applications is not None:
+    if not isinstance(selected_applications, dict) or not selected_applications:
+        raise SystemExit("mission resolved.applications must be a non-empty object when present")
+
+    catalog_relpath = str(selected_applications.get("catalog_relpath", "")).strip()
+    images_lock_relpath = str(selected_applications.get("images_lock_relpath", "")).strip()
+    selection_relpath = str(selected_applications.get("selection_relpath", "")).strip()
+
+    if not catalog_relpath:
+        raise SystemExit("mission resolved.applications.catalog_relpath must be set")
+    if not images_lock_relpath:
+        raise SystemExit("mission resolved.applications.images_lock_relpath must be set")
+    if not selection_relpath:
+        raise SystemExit("mission resolved.applications.selection_relpath must be set")
 
 values = [
     str(selected_os.get("selection_source", "")).strip(),
@@ -347,6 +369,10 @@ values = [
     str(selected_substrate.get("artifact_digest", "")).strip(),
     str(selected_substrate.get("payload_relpath", "")).strip(),
     str(selected_substrate.get("manifest_relpath", "")).strip(),
+    catalog_relpath,
+    images_lock_relpath,
+    selection_relpath,
+    "__MISSION_FIELDS_END__",
 ]
 print("\n".join(values))
 PY
@@ -354,7 +380,8 @@ PY
 
   local mission_fields=()
   mapfile -t mission_fields <<<"${mission_dump}"
-  [[ "${#mission_fields[@]}" -eq 12 ]] || die "mission-manifest.json parse produced an unexpected field set"
+  [[ "${#mission_fields[@]}" -eq 16 ]] || die "mission-manifest.json parse produced an unexpected field set"
+  [[ "${mission_fields[15]}" == "__MISSION_FIELDS_END__" ]] || die "mission-manifest.json parse sentinel mismatch"
 
   INSTALL_SELECTION_SOURCE="${mission_fields[0]}"
   RELEASE_CHANNEL="${mission_fields[1]}"
@@ -369,11 +396,33 @@ PY
   local substrate_payload=""
   substrate_payload="$(resolve_mission_relpath "mission substrate bundle relpath" "${mission_fields[10]}")"
   SUBSTRATE_MANIFEST_PATH="$(resolve_mission_relpath "mission substrate bundle manifest relpath" "${mission_fields[11]}")"
+  if [[ -n "${mission_fields[12]}" ]]; then
+    MISSION_APPLICATION_CATALOG_PATH="$(resolve_mission_relpath "mission selected_applications.catalog_relpath" "${mission_fields[12]}")"
+    MISSION_APPLICATION_IMAGES_LOCK_PATH="$(
+      resolve_mission_relpath "mission selected_applications.images_lock_relpath" "${mission_fields[13]}"
+    )"
+    MISSION_SELECTED_APPLICATIONS_PATH="$(
+      resolve_mission_relpath "mission selected_applications.selection_relpath" "${mission_fields[14]}"
+    )"
+  else
+    MISSION_APPLICATION_CATALOG_PATH=""
+    MISSION_APPLICATION_IMAGES_LOCK_PATH=""
+    MISSION_SELECTED_APPLICATIONS_PATH=""
+  fi
 
   [[ -f "${PAYLOAD_PATH}" ]] || die "mission OS payload missing: ${PAYLOAD_PATH}"
   [[ -f "${PAYLOAD_META}" ]] || die "mission OS metadata missing: ${PAYLOAD_META}"
   [[ -f "${substrate_payload}" ]] || die "mission substrate bundle missing: ${substrate_payload}"
   [[ -f "${SUBSTRATE_MANIFEST_PATH}" ]] || die "mission substrate bundle manifest missing: ${SUBSTRATE_MANIFEST_PATH}"
+  if [[ -n "${MISSION_APPLICATION_CATALOG_PATH}" ]]; then
+    [[ -f "${MISSION_APPLICATION_CATALOG_PATH}" ]] || die "mission application catalog missing: ${MISSION_APPLICATION_CATALOG_PATH}"
+    [[ -f "${MISSION_APPLICATION_IMAGES_LOCK_PATH}" ]] || {
+      die "mission application images lock missing: ${MISSION_APPLICATION_IMAGES_LOCK_PATH}"
+    }
+    [[ -f "${MISSION_SELECTED_APPLICATIONS_PATH}" ]] || {
+      die "mission selected applications file missing: ${MISSION_SELECTED_APPLICATIONS_PATH}"
+    }
+  fi
 
   local payload_sha_file="${PAYLOAD_PATH}.sha256"
   [[ -f "${payload_sha_file}" ]] || die "mission OS payload checksum missing: ${payload_sha_file}"
@@ -472,8 +521,13 @@ overlay_selected_ourbox_substrate_into_mounted_root() {
   rm -rf "${target_substrate}/k3s" "${target_platform}/images"
   cp -a "${SUBSTRATE_EXTRACT_DIR}/k3s" "${target_substrate}/k3s"
   cp -a "${SUBSTRATE_EXTRACT_DIR}/platform/images" "${target_platform}/images"
-  cp -f "${SUBSTRATE_EXTRACT_DIR}/platform/images.lock.json" "${target_platform}/images.lock.json"
+  cp -f "${SUBSTRATE_EXTRACT_DIR}/platform/images.lock.json" "${target_platform}/platform-images.lock.json"
   cp -f "${SUBSTRATE_EXTRACT_DIR}/platform/profile.env" "${target_platform}/profile.env"
+  if [[ -n "${MISSION_APPLICATION_CATALOG_PATH}" ]]; then
+    cp -f "${MISSION_APPLICATION_CATALOG_PATH}" "${target_platform}/catalog.json"
+    cp -f "${MISSION_APPLICATION_IMAGES_LOCK_PATH}" "${target_platform}/images.lock.json"
+    cp -f "${MISSION_SELECTED_APPLICATIONS_PATH}" "${target_platform}/selected-apps.json"
+  fi
   cp -f "${SUBSTRATE_EXTRACT_DIR}/manifest.env" "${target_substrate}/manifest.env"
   log "Applied staged substrate bundle into installed rootfs"
 }

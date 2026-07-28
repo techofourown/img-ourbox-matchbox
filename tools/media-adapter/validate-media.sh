@@ -447,6 +447,160 @@ staged_substrate_manifest = require_staged_file("selected_substrate.manifest_rel
 validate_sha256_sidecar("selected_substrate.payload_relpath", substrate_payload_relpath, staged_substrate_payload)
 validate_substrate_bundle(staged_substrate_payload, staged_substrate_manifest)
 
+selected_applications = resolved.get("applications")
+supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
+if selected_applications is not None:
+    if not isinstance(selected_applications, dict) or not selected_applications:
+        raise SystemExit("mission selected_applications must be a non-empty object when present")
+
+    catalog_id = str(selected_applications.get("catalog_id", "")).strip()
+    catalog_name = str(selected_applications.get("catalog_name", "")).strip()
+    selection_mode = str(selected_applications.get("selection_mode", "")).strip()
+    catalog_relpath = selected_applications.get("catalog_relpath")
+    images_lock_relpath = selected_applications.get("images_lock_relpath")
+    selection_relpath = selected_applications.get("selection_relpath")
+    selected_app_ids = selected_applications.get("selected_app_ids")
+    if not catalog_id:
+        raise SystemExit("mission selected_applications.catalog_id must be set")
+    if not catalog_name:
+        raise SystemExit("mission selected_applications.catalog_name must be set")
+    if selection_mode not in supported_selection_modes:
+        raise SystemExit(
+            "mission selected_applications.selection_mode must be one of catalog-defaults, all-apps, custom"
+        )
+    if not catalog_relpath:
+        raise SystemExit("mission selected_applications.catalog_relpath must be set")
+    if not images_lock_relpath:
+        raise SystemExit("mission selected_applications.images_lock_relpath must be set")
+    if not selection_relpath:
+        raise SystemExit("mission selected_applications.selection_relpath must be set")
+    if not isinstance(selected_app_ids, list) or not selected_app_ids:
+        raise SystemExit("mission selected_applications.selected_app_ids must be a non-empty list")
+
+    normalized_app_ids = []
+    seen_ids = set()
+    for raw_app_id in selected_app_ids:
+        app_id = str(raw_app_id).strip()
+        if not app_id:
+            raise SystemExit("mission selected_applications.selected_app_ids contains an empty app id")
+        if app_id in seen_ids:
+            raise SystemExit(f"mission selected_applications.selected_app_ids duplicates app id {app_id}")
+        seen_ids.add(app_id)
+        normalized_app_ids.append(app_id)
+
+    catalog_path = require_staged_file("mission selected_applications.catalog_relpath", catalog_relpath)
+    images_lock_path = require_staged_file("mission selected_applications.images_lock_relpath", images_lock_relpath)
+    selection_path = require_staged_file("mission selected_applications.selection_relpath", selection_relpath)
+
+    with catalog_path.open("r", encoding="utf-8") as handle:
+        catalog_data = json.load(handle)
+    if catalog_data.get("schema") != 1:
+        raise SystemExit("mission application catalog must declare schema=1")
+    if catalog_data.get("kind") != "ourbox-application-catalog":
+        raise SystemExit("mission application catalog kind must be 'ourbox-application-catalog'")
+    if str(catalog_data.get("catalog_id", "")) != catalog_id:
+        raise SystemExit("mission application catalog catalog_id must match selected_applications.catalog_id")
+    if str(catalog_data.get("catalog_name", "")) != catalog_name:
+        raise SystemExit("mission application catalog catalog_name must match selected_applications.catalog_name")
+    catalog_apps = catalog_data.get("apps")
+    if not isinstance(catalog_apps, list) or not catalog_apps:
+        raise SystemExit("mission application catalog must declare a non-empty apps list")
+    catalog_app_ids = set()
+    catalog_apps_by_id = {}
+    for app in catalog_apps:
+        app_id = str(app.get("id", "")).strip()
+        if not app_id:
+            raise SystemExit("mission application catalog contains an app without an id")
+        if app_id in catalog_app_ids:
+            raise SystemExit(f"mission application catalog duplicates app id {app_id}")
+        catalog_app_ids.add(app_id)
+        catalog_apps_by_id[app_id] = app
+    unknown_app_ids = [app_id for app_id in normalized_app_ids if app_id not in catalog_app_ids]
+    if unknown_app_ids:
+        raise SystemExit(
+            "mission selected_applications.selected_app_ids must be a subset of mission application catalog apps"
+        )
+
+    with images_lock_path.open("r", encoding="utf-8") as handle:
+        images_lock_data = json.load(handle)
+    if images_lock_data.get("schema") != 1:
+        raise SystemExit("mission application images lock must declare schema=1")
+    images = images_lock_data.get("images")
+    if not isinstance(images, list) or not images:
+        raise SystemExit("mission application images lock must declare a non-empty images list")
+    seen_image_names = set()
+    for image in images:
+        image_name = str(image.get("name", "")).strip()
+        image_ref = str(image.get("ref", "")).strip()
+        if not image_name:
+            raise SystemExit("mission application images lock contains an image without a name")
+        if image_name in seen_image_names:
+            raise SystemExit(f"mission application images lock duplicates image name {image_name}")
+        if not image_ref:
+            raise SystemExit(f"mission application images lock entry {image_name} is missing a ref")
+        seen_image_names.add(image_name)
+
+    for app_id in normalized_app_ids:
+        app = catalog_apps_by_id[app_id]
+        image_names = app.get("image_names")
+        if not isinstance(image_names, list) or not image_names:
+            raise SystemExit(f"mission application catalog app {app_id} must declare a non-empty image_names list")
+        normalized_image_names = set()
+        for raw_image_name in image_names:
+            image_name = str(raw_image_name).strip()
+            if not image_name:
+                raise SystemExit(f"mission application catalog app {app_id} contains an empty image_names entry")
+            normalized_image_names.add(image_name)
+        services = app.get("services")
+        if not isinstance(services, list) or not services:
+            raise SystemExit(f"mission application catalog app {app_id} must declare a non-empty services list")
+        for service in services:
+            service_name = str(service.get("name", "")).strip()
+            if not service_name:
+                raise SystemExit(f"mission application catalog app {app_id} contains a service without a name")
+            image_name = str(service.get("image", "")).strip()
+            if not image_name:
+                raise SystemExit(f"mission application catalog app {app_id} service {service_name} must declare an image")
+            if image_name not in normalized_image_names:
+                raise SystemExit(
+                    f"mission application catalog app {app_id} service {service_name} references image {image_name} "
+                    "not listed in image_names"
+                )
+            if image_name not in seen_image_names:
+                raise SystemExit(
+                    f"mission application images lock is missing image {image_name} required by selected app "
+                    f"{app_id} service {service_name}"
+                )
+
+    with selection_path.open("r", encoding="utf-8") as handle:
+        selection_data = json.load(handle)
+    if selection_data.get("schema") != 1:
+        raise SystemExit("mission selected applications file must declare schema=1")
+    if selection_data.get("kind") != "ourbox-selected-applications":
+        raise SystemExit("mission selected applications file kind must be 'ourbox-selected-applications'")
+    if str(selection_data.get("catalog_id", "")) != catalog_id:
+        raise SystemExit("mission selected applications file catalog_id must match selected_applications.catalog_id")
+    if str(selection_data.get("selection_mode", "")) != selection_mode:
+        raise SystemExit("mission selected applications file selection_mode must match selected_applications.selection_mode")
+
+    selection_ids = selection_data.get("selected_app_ids")
+    if not isinstance(selection_ids, list) or not selection_ids:
+        raise SystemExit("mission selected applications file must declare a non-empty selected_app_ids list")
+
+    normalized_selection_ids = []
+    seen_selection_ids = set()
+    for raw_app_id in selection_ids:
+        app_id = str(raw_app_id).strip()
+        if not app_id:
+            raise SystemExit("mission selected applications file contains an empty app id")
+        if app_id in seen_selection_ids:
+            raise SystemExit(f"mission selected applications file duplicates app id {app_id}")
+        seen_selection_ids.add(app_id)
+        normalized_selection_ids.append(app_id)
+
+    if normalized_selection_ids != normalized_app_ids:
+        raise SystemExit("mission selected applications file does not match selected_applications.selected_app_ids")
+
 installed_target_ssh = resolved.get("installed_target_ssh")
 if installed_target_ssh is not None:
     mode = str(installed_target_ssh.get("mode", "")).strip()

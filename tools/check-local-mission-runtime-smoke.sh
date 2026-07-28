@@ -14,11 +14,13 @@ trap 'rm -rf "${TMP}"' EXIT
 
 TOOLS_DIR="${TMP}/tools"
 INSTALLER_SCRIPT="${TMP}/ourbox-install"
+BOOTSTRAP_SCRIPT="${ROOT}/pigen/stages/stage-ourbox-matchbox/02-ourbox-substrate/files/usr/local/sbin/ourbox-bootstrap"
 MISSION_ROOT="${TMP}/mission"
 MISSION_OS_DIR="${MISSION_ROOT}/artifacts/os"
 MISSION_SUBSTRATE_DIR="${MISSION_ROOT}/artifacts/substrate"
 SUBSTRATE_SOURCE_DIR="${TMP}/substrate-source"
 SUBSTRATE_EXTRACT_DIR="${TMP}/substrate-extract"
+TARGET_ROOT="${TMP}/target-root"
 
 mkdir -p "${TOOLS_DIR}" "${MISSION_OS_DIR}" "${MISSION_SUBSTRATE_DIR}" \
   "${SUBSTRATE_SOURCE_DIR}/k3s" "${SUBSTRATE_SOURCE_DIR}/platform/images"
@@ -53,17 +55,65 @@ printf '#!/bin/sh\nexit 0\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
 chmod +x "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
 printf 'fixture substrate images\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s-images-arm64.tar"
 printf '{"images":[]}\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images.lock.json"
-printf 'PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
+printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
 printf 'fixture image tar\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images/platform-demo.tar"
 tar -C "${SUBSTRATE_SOURCE_DIR}" -czf "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
 cp "${SUBSTRATE_SOURCE_DIR}/manifest.env" "${MISSION_SUBSTRATE_DIR}/manifest.env"
+cat > "${MISSION_SUBSTRATE_DIR}/catalog.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "demo-apps",
+  "catalog_name": "Demo Apps",
+  "default_app_ids": [
+    "landing"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "image_names": [
+        "landing"
+      ],
+      "services": [
+        {
+          "name": "landing",
+          "image": "landing",
+          "port": 80
+        }
+      ]
+    }
+  ]
+}
+EOF
+cat > "${MISSION_SUBSTRATE_DIR}/selected-apps.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "custom",
+  "selected_app_ids": [
+    "landing"
+  ]
+}
+EOF
+cat > "${MISSION_SUBSTRATE_DIR}/application-images.lock.json" <<'EOF'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ]
+}
+EOF
 
 cat > "${MISSION_ROOT}/mission-manifest.json" <<EOF
 {
   "kind": "ourbox-mission",
   "target": {
     "id": "matchbox",
-    "media_kind": "installer-image"
+    "media_kind": "installer-usb"
   },
   "requested": {
     "os": {
@@ -95,6 +145,17 @@ cat > "${MISSION_ROOT}/mission-manifest.json" <<EOF
       "artifact_digest": "${SUBSTRATE_DIGEST}",
       "payload_relpath": "artifacts/substrate/ourbox-substrate.tar.gz",
       "manifest_relpath": "artifacts/substrate/manifest.env"
+    },
+    "applications": {
+      "catalog_id": "demo-apps",
+      "catalog_name": "Demo Apps",
+      "selection_mode": "custom",
+      "selected_app_ids": [
+        "landing"
+      ],
+      "catalog_relpath": "artifacts/substrate/catalog.json",
+      "images_lock_relpath": "artifacts/substrate/application-images.lock.json",
+      "selection_relpath": "artifacts/substrate/selected-apps.json"
     }
   },
   "staged_files": []
@@ -126,6 +187,9 @@ run_loader() {
       printf "OURBOX_SUBSTRATE_ARCH=%s\n" "${OURBOX_SUBSTRATE_ARCH}"
       printf "OURBOX_SUBSTRATE_PROFILE=%s\n" "${OURBOX_SUBSTRATE_PROFILE}"
       printf "SUBSTRATE_MANIFEST_PATH=%s\n" "${SUBSTRATE_MANIFEST_PATH}"
+      printf "MISSION_APPLICATION_CATALOG_PATH=%s\n" "${MISSION_APPLICATION_CATALOG_PATH}"
+      printf "MISSION_APPLICATION_IMAGES_LOCK_PATH=%s\n" "${MISSION_APPLICATION_IMAGES_LOCK_PATH}"
+      printf "MISSION_SELECTED_APPLICATIONS_PATH=%s\n" "${MISSION_SELECTED_APPLICATIONS_PATH}"
     ' bash "${INSTALLER_SCRIPT}"
 }
 
@@ -151,11 +215,108 @@ grep -Fq "PAYLOAD_META=${MISSION_ROOT}/artifacts/os/os.meta.env" <<<"${loader_ou
   || die "matchbox runtime did not resolve the mission OS metadata path"
 grep -Fq "SUBSTRATE_MANIFEST_PATH=${MISSION_ROOT}/artifacts/substrate/manifest.env" <<<"${loader_output}" \
   || die "matchbox runtime did not resolve the substrate bundle manifest path"
+grep -Fq "MISSION_APPLICATION_CATALOG_PATH=${MISSION_ROOT}/artifacts/substrate/catalog.json" <<<"${loader_output}" \
+  || die "matchbox runtime did not resolve the mission application catalog path"
+grep -Fq "MISSION_APPLICATION_IMAGES_LOCK_PATH=${MISSION_ROOT}/artifacts/substrate/application-images.lock.json" <<<"${loader_output}" \
+  || die "matchbox runtime did not resolve the mission application images lock path"
+grep -Fq "MISSION_SELECTED_APPLICATIONS_PATH=${MISSION_ROOT}/artifacts/substrate/selected-apps.json" <<<"${loader_output}" \
+  || die "matchbox runtime did not resolve the mission selected applications path"
 
 [[ -f "${SUBSTRATE_EXTRACT_DIR}/manifest.env" ]] \
   || die "matchbox runtime did not extract the substrate bundle manifest"
 [[ -x "${SUBSTRATE_EXTRACT_DIR}/k3s/k3s" ]] \
   || die "matchbox runtime did not extract the substrate bundle runtime"
+
+# shellcheck disable=SC2016
+env \
+  OURBOX_INSTALL_LIBRARY_ONLY=1 \
+  OURBOX_INSTALL_TOOLS_ROOT="${TOOLS_DIR}" \
+  OURBOX_INSTALL_MISSION_ROOT="${MISSION_ROOT}" \
+  OURBOX_INSTALL_SUBSTRATE_EXTRACT_DIR="${SUBSTRATE_EXTRACT_DIR}" \
+  OURBOX_INSTALL_SYS_ROOT_MP="${TARGET_ROOT}" \
+  bash -lc '
+    set -euo pipefail
+    source "$1"
+    load_local_mission
+    overlay_selected_ourbox_substrate_into_mounted_root
+  ' bash "${INSTALLER_SCRIPT}"
+
+cmp -s "${SUBSTRATE_SOURCE_DIR}/platform/images.lock.json" \
+  "${TARGET_ROOT}/opt/ourbox/substrate/platform/platform-images.lock.json" \
+  || die "matchbox runtime did not preserve the platform-owned images lock in platform-images.lock.json"
+cmp -s "${MISSION_SUBSTRATE_DIR}/application-images.lock.json" \
+  "${TARGET_ROOT}/opt/ourbox/substrate/platform/images.lock.json" \
+  || die "matchbox runtime did not stage the mission application images lock into images.lock.json"
+cmp -s "${MISSION_SUBSTRATE_DIR}/catalog.json" \
+  "${TARGET_ROOT}/opt/ourbox/substrate/platform/catalog.json" \
+  || die "matchbox runtime did not stage the mission application catalog"
+cmp -s "${MISSION_SUBSTRATE_DIR}/selected-apps.json" \
+  "${TARGET_ROOT}/opt/ourbox/substrate/platform/selected-apps.json" \
+  || die "matchbox runtime did not stage the mission selected applications file"
+
+BAKED_TARGET_ROOT="${TMP}/baked-target-root"
+NO_APPS_MISSION_ROOT="${TMP}/no-apps-mission"
+mkdir -p "${BAKED_TARGET_ROOT}/opt/ourbox/substrate/platform"
+cp -f "${MISSION_SUBSTRATE_DIR}/catalog.json" "${BAKED_TARGET_ROOT}/opt/ourbox/substrate/platform/catalog.json"
+cp -f "${MISSION_SUBSTRATE_DIR}/application-images.lock.json" "${BAKED_TARGET_ROOT}/opt/ourbox/substrate/platform/images.lock.json"
+cp -f "${MISSION_SUBSTRATE_DIR}/selected-apps.json" "${BAKED_TARGET_ROOT}/opt/ourbox/substrate/platform/selected-apps.json"
+
+cp -a "${MISSION_ROOT}" "${NO_APPS_MISSION_ROOT}"
+python3 - <<'PY' "${NO_APPS_MISSION_ROOT}/mission-manifest.json"
+import json
+import pathlib
+import sys
+
+manifest_path = pathlib.Path(sys.argv[1])
+with manifest_path.open("r", encoding="utf-8") as handle:
+    manifest = json.load(handle)
+
+manifest.get("requested", {}).pop("applications", None)
+manifest.get("resolved", {}).pop("applications", None)
+
+with manifest_path.open("w", encoding="utf-8") as handle:
+    json.dump(manifest, handle, indent=2)
+    handle.write("\n")
+PY
+
+no_apps_loader_output="$(run_loader "${NO_APPS_MISSION_ROOT}" "${TMP}/no-apps-substrate-extract")"
+grep -Fq "MISSION_APPLICATION_CATALOG_PATH=" <<<"${no_apps_loader_output}" \
+  || die "matchbox runtime did not allow a no-applications mission"
+grep -Fq "MISSION_APPLICATION_IMAGES_LOCK_PATH=" <<<"${no_apps_loader_output}" \
+  || die "matchbox runtime did not leave the mission application images lock path empty"
+grep -Fq "MISSION_SELECTED_APPLICATIONS_PATH=" <<<"${no_apps_loader_output}" \
+  || die "matchbox runtime did not leave the mission selected applications path empty"
+
+# shellcheck disable=SC2016
+env \
+  OURBOX_INSTALL_LIBRARY_ONLY=1 \
+  OURBOX_INSTALL_TOOLS_ROOT="${TOOLS_DIR}" \
+  OURBOX_INSTALL_MISSION_ROOT="${NO_APPS_MISSION_ROOT}" \
+  OURBOX_INSTALL_SUBSTRATE_EXTRACT_DIR="${TMP}/no-apps-substrate-extract" \
+  OURBOX_INSTALL_SYS_ROOT_MP="${BAKED_TARGET_ROOT}" \
+  bash -lc '
+    set -euo pipefail
+    source "$1"
+    load_local_mission
+    overlay_selected_ourbox_substrate_into_mounted_root
+  ' bash "${INSTALLER_SCRIPT}"
+
+cmp -s "${MISSION_SUBSTRATE_DIR}/catalog.json" \
+  "${BAKED_TARGET_ROOT}/opt/ourbox/substrate/platform/catalog.json" \
+  || die "matchbox runtime should preserve baked catalog.json when mission applications are absent"
+cmp -s "${MISSION_SUBSTRATE_DIR}/application-images.lock.json" \
+  "${BAKED_TARGET_ROOT}/opt/ourbox/substrate/platform/images.lock.json" \
+  || die "matchbox runtime should preserve baked images.lock.json when mission applications are absent"
+cmp -s "${MISSION_SUBSTRATE_DIR}/selected-apps.json" \
+  "${BAKED_TARGET_ROOT}/opt/ourbox/substrate/platform/selected-apps.json" \
+  || die "matchbox runtime should preserve baked selected-apps.json when mission applications are absent"
+
+grep -Fq 'selected-app-surface.json' "${BOOTSTRAP_SCRIPT}" \
+  || die "matchbox bootstrap does not persist selected-app-surface.json"
+grep -Fq "[[ -f \"\${SELECTED_APP_SURFACE_STATE}\" ]] || return 1" "${BOOTSTRAP_SCRIPT}" \
+  || die "matchbox bootstrap fast-path does not require selected-app-surface.json"
+grep -Fq 'systemctl restart ourbox-mdns-aliases.service ourbox-status.service' "${BOOTSTRAP_SCRIPT}" \
+  || die "matchbox bootstrap does not restart runtime surface consumers after render"
 
 set +e
 library_exec_output="$(OURBOX_INSTALL_LIBRARY_ONLY=1 bash "${INSTALLER_SCRIPT}" 2>&1)"

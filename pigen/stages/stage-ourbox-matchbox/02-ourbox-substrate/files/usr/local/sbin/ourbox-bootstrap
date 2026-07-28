@@ -8,12 +8,18 @@ kubectl_cmd(){ /usr/local/bin/k3s kubectl --kubeconfig "${KUBECONFIG_PATH}" "$@"
 STATE_DIR="/var/lib/ourbox/state"
 MARKER="${STATE_DIR}/bootstrap.done"
 APPLIED_CONTRACT_STATE="${STATE_DIR}/platform-contract.env"
+SELECTED_APP_SURFACE_STATE="${STATE_DIR}/selected-app-surface.json"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 HOSTNAME="$(hostname)"
 PLATFORM_CONTRACT_DIR="/opt/ourbox/substrate/platform"
 RENDER_DIR="/run/ourbox-platform-rendered"
 DESIRED_CONTRACT_STATE=""
-PLATFORM_PROFILE_INPUT="${OURBOX_PLATFORM_PROFILE:-demo-apps}"
+PLATFORM_PROFILE_INPUT=""
+SELECTED_APPS_FILE="${PLATFORM_CONTRACT_DIR}/selected-apps.json"
+APPLICATION_CATALOG_FILE="${PLATFORM_CONTRACT_DIR}/catalog.json"
+APPLICATION_IMAGES_LOCK_FILE="${PLATFORM_CONTRACT_DIR}/images.lock.json"
+PLATFORM_IMAGES_LOCK_FILE="${PLATFORM_CONTRACT_DIR}/platform-images.lock.json"
+RENDER_CONTRACT_HELP_CACHE=""
 
 cleanup() {
   if [[ -n "${DESIRED_CONTRACT_STATE}" && -f "${DESIRED_CONTRACT_STATE}" ]]; then
@@ -25,6 +31,246 @@ trap cleanup EXIT
 ensure_k3s_running() {
   systemctl is-enabled --quiet k3s.service 2>/dev/null || systemctl enable k3s.service
   systemctl is-active --quiet k3s.service 2>/dev/null || systemctl start k3s.service
+}
+
+render_contract_help() {
+  if [[ -z "${RENDER_CONTRACT_HELP_CACHE}" ]]; then
+    RENDER_CONTRACT_HELP_CACHE="$(
+      python3 "${PLATFORM_CONTRACT_DIR}/tools/render-contract.py" --help 2>&1
+    )" || die "platform-contract render-contract.py is not runnable: ${PLATFORM_CONTRACT_DIR}/tools/render-contract.py"
+  fi
+  printf '%s\n' "${RENDER_CONTRACT_HELP_CACHE}"
+}
+
+render_contract_supports_option() {
+  local option="$1"
+  grep -Fq -- "${option}" <<<"$(render_contract_help)"
+}
+
+require_render_contract_option() {
+  local option="$1"
+  local reason="$2"
+  if ! render_contract_supports_option "${option}"; then
+    die "${reason}. Rebuild with a compatible platform-contract artifact."
+  fi
+}
+
+identity_output_value() {
+  local identity_output="$1" key="$2"
+  awk -F= -v wanted="${key}" '
+    $1 == wanted {
+      print substr($0, index($0, "=") + 1)
+      exit
+    }
+  ' <<<"${identity_output}"
+}
+
+load_platform_profile_input() {
+  local profile_env="${PLATFORM_CONTRACT_DIR}/profile.env"
+
+  if [[ -n "${OURBOX_PLATFORM_PROFILE:-}" ]]; then
+    PLATFORM_PROFILE_INPUT="${OURBOX_PLATFORM_PROFILE}"
+    return 0
+  fi
+
+  if [[ -f "${profile_env}" ]]; then
+    PLATFORM_PROFILE_INPUT="$(
+      awk -F= '
+        $1 == "OURBOX_PLATFORM_PROFILE" {
+          print substr($0, index($0, "=") + 1)
+          exit
+        }
+      ' "${profile_env}"
+    )"
+  fi
+
+  [[ -n "${PLATFORM_PROFILE_INPUT}" ]] || \
+    die "supported mission installs require OURBOX_PLATFORM_PROFILE or ${profile_env} with OURBOX_PLATFORM_PROFILE"
+}
+
+require_application_intent_files() {
+  [[ -f "${APPLICATION_CATALOG_FILE}" ]] || \
+    die "supported mission installs require ${APPLICATION_CATALOG_FILE}"
+  [[ -f "${SELECTED_APPS_FILE}" ]] || \
+    die "supported mission installs require ${SELECTED_APPS_FILE}"
+  [[ -f "${APPLICATION_IMAGES_LOCK_FILE}" ]] || \
+    die "supported mission installs require ${APPLICATION_IMAGES_LOCK_FILE}"
+  [[ -f "${PLATFORM_IMAGES_LOCK_FILE}" ]] || \
+    die "supported mission installs require ${PLATFORM_IMAGES_LOCK_FILE}"
+
+  python3 - <<'PY' "${APPLICATION_CATALOG_FILE}" "${SELECTED_APPS_FILE}" "${APPLICATION_IMAGES_LOCK_FILE}"
+import json
+import pathlib
+import sys
+
+catalog_path = pathlib.Path(sys.argv[1])
+selected_apps_path = pathlib.Path(sys.argv[2])
+images_lock_path = pathlib.Path(sys.argv[3])
+supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
+
+with catalog_path.open("r", encoding="utf-8") as handle:
+    catalog = json.load(handle)
+with selected_apps_path.open("r", encoding="utf-8") as handle:
+    selected = json.load(handle)
+with images_lock_path.open("r", encoding="utf-8") as handle:
+    images_lock = json.load(handle)
+
+if catalog.get("schema") != 1:
+    raise SystemExit(f"{catalog_path} must declare schema=1")
+if catalog.get("kind") != "ourbox-application-catalog":
+    raise SystemExit(f"{catalog_path} must declare kind=ourbox-application-catalog")
+catalog_id = str(catalog.get("catalog_id", "")).strip()
+if not catalog_id:
+    raise SystemExit(f"{catalog_path} must declare catalog_id")
+catalog_apps = catalog.get("apps")
+if not isinstance(catalog_apps, list) or not catalog_apps:
+    raise SystemExit(f"{catalog_path} must declare a non-empty apps list")
+catalog_app_ids = set()
+catalog_apps_by_id = {}
+for app in catalog_apps:
+    app_id = str(app.get("id", "")).strip()
+    if not app_id:
+        raise SystemExit(f"{catalog_path} contains an app without an id")
+    if app_id in catalog_app_ids:
+        raise SystemExit(f"{catalog_path} duplicates app id {app_id}")
+    catalog_app_ids.add(app_id)
+    catalog_apps_by_id[app_id] = app
+
+if selected.get("schema") != 1:
+    raise SystemExit(f"{selected_apps_path} must declare schema=1")
+if selected.get("kind") != "ourbox-selected-applications":
+    raise SystemExit(f"{selected_apps_path} must declare kind=ourbox-selected-applications")
+if str(selected.get("catalog_id", "")).strip() != catalog_id:
+    raise SystemExit(f"{selected_apps_path} catalog_id must match {catalog_path}")
+selection_mode = str(selected.get("selection_mode", "")).strip()
+if selection_mode not in supported_selection_modes:
+    raise SystemExit(
+        f"{selected_apps_path} selection_mode must be one of catalog-defaults, all-apps, custom"
+    )
+selected_ids = selected.get("selected_app_ids")
+if not isinstance(selected_ids, list) or not selected_ids:
+    raise SystemExit(f"{selected_apps_path} must declare a non-empty selected_app_ids list")
+seen_ids = set()
+for raw_app_id in selected_ids:
+    app_id = str(raw_app_id).strip()
+    if not app_id:
+        raise SystemExit(f"{selected_apps_path} contains an empty app id")
+    if app_id in seen_ids:
+        raise SystemExit(f"{selected_apps_path} duplicates app id {app_id}")
+    if app_id not in catalog_app_ids:
+        raise SystemExit(f"{selected_apps_path} references unknown app id {app_id}")
+    seen_ids.add(app_id)
+
+images = images_lock.get("images")
+if not isinstance(images, list) or not images:
+    raise SystemExit(f"{images_lock_path} must declare a non-empty images list")
+seen_image_names = set()
+for image in images:
+    name = str(image.get("name", "")).strip()
+    ref = str(image.get("ref", "")).strip()
+    if not name:
+        raise SystemExit(f"{images_lock_path} contains an image without a name")
+    if not ref:
+        raise SystemExit(f"{images_lock_path} contains an image without a ref")
+    if name in seen_image_names:
+        raise SystemExit(f"{images_lock_path} duplicates image name {name}")
+    seen_image_names.add(name)
+
+for app_id in seen_ids:
+    app = catalog_apps_by_id[app_id]
+    image_names = app.get("image_names")
+    if not isinstance(image_names, list) or not image_names:
+        raise SystemExit(f"{catalog_path} app {app_id} must declare a non-empty image_names list")
+    normalized_image_names = set()
+    for raw_image_name in image_names:
+        image_name = str(raw_image_name).strip()
+        if not image_name:
+            raise SystemExit(f"{catalog_path} app {app_id} contains an empty image_names entry")
+        normalized_image_names.add(image_name)
+    services = app.get("services")
+    if not isinstance(services, list) or not services:
+        raise SystemExit(f"{catalog_path} app {app_id} must declare a non-empty services list")
+    for service in services:
+        service_name = str(service.get("name", "")).strip()
+        if not service_name:
+            raise SystemExit(f"{catalog_path} app {app_id} contains a service without a name")
+        image_name = str(service.get("image", "")).strip()
+        if not image_name:
+            raise SystemExit(f"{catalog_path} app {app_id} service {service_name} must declare an image")
+        if image_name not in normalized_image_names:
+            raise SystemExit(
+                f"{catalog_path} app {app_id} service {service_name} references image {image_name} "
+                "not listed in image_names"
+            )
+        if image_name not in seen_image_names:
+            raise SystemExit(
+                f"{images_lock_path} is missing image {image_name} required by selected app {app_id} "
+                f"service {service_name}"
+            )
+PY
+}
+
+require_platform_contract_capabilities() {
+  local identity_output required_key=""
+
+  require_render_contract_option \
+    "--selected-apps-file" \
+    "supported mission installs require platform-contract render-contract.py to accept --selected-apps-file"
+  require_render_contract_option \
+    "--application-catalog" \
+    "supported mission installs require platform-contract render-contract.py to accept --application-catalog"
+  require_render_contract_option \
+    "--images-lock-file" \
+    "supported mission installs require platform-contract render-contract.py to accept --images-lock-file"
+  require_render_contract_option \
+    "--platform-images-lock-file" \
+    "supported mission installs require platform-contract render-contract.py to accept --platform-images-lock-file"
+
+  identity_output="$(
+    "${PLATFORM_CONTRACT_DIR}/tools/contract-identity.sh" \
+      --contract-dir "${PLATFORM_CONTRACT_DIR}" \
+      --profile "${PLATFORM_PROFILE_INPUT}" \
+      --box-host "${OURBOX_BOX_HOST:-${HOSTNAME}.local}" \
+      --tls-mode "${OURBOX_TLS_MODE:-}" \
+      --ingress-class "${OURBOX_INGRESS_CLASS:-}" \
+      --storage-class "${OURBOX_STORAGE_CLASS:-}"
+  )" || die "platform-contract contract-identity.sh failed while validating application metadata support"
+
+  for required_key in \
+    "OURBOX_APPLICATION_CATALOG_ID=" \
+    "OURBOX_APPLICATION_SELECTION_MODE=" \
+    "OURBOX_SELECTED_APPLICATION_IDS=" \
+    "OURBOX_APPLICATION_CATALOG_SHA256=" \
+    "OURBOX_APPLICATION_IMAGES_LOCK_SHA256="; do
+    if ! grep -Fq -- "${required_key}" <<<"${identity_output}"; then
+      die "platform-contract contract-identity.sh does not emit ${required_key%=} required for application metadata state tracking. Rebuild with a compatible platform-contract artifact."
+    fi
+  done
+
+  if [[ -f "${SELECTED_APPS_FILE}" ]]; then
+    for required_key in \
+      "OURBOX_APPLICATION_CATALOG_ID" \
+      "OURBOX_APPLICATION_SELECTION_MODE" \
+      "OURBOX_SELECTED_APPLICATION_IDS"; do
+      if [[ -z "$(identity_output_value "${identity_output}" "${required_key}")" ]]; then
+        die "platform-contract contract-identity.sh leaves ${required_key} empty while selected application metadata is present. Rebuild with a compatible platform-contract artifact."
+      fi
+    done
+    case "$(identity_output_value "${identity_output}" "OURBOX_APPLICATION_SELECTION_MODE")" in
+      catalog-defaults|all-apps|custom) ;;
+      *)
+        die "platform-contract contract-identity.sh reports an unsupported OURBOX_APPLICATION_SELECTION_MODE while selected application metadata is present. Rebuild with a compatible platform-contract artifact."
+        ;;
+    esac
+  fi
+
+  if [[ -f "${APPLICATION_CATALOG_FILE}" ]] && [[ -z "$(identity_output_value "${identity_output}" "OURBOX_APPLICATION_CATALOG_SHA256")" ]]; then
+    die "platform-contract contract-identity.sh leaves OURBOX_APPLICATION_CATALOG_SHA256 empty while application catalog metadata is present. Rebuild with a compatible platform-contract artifact."
+  fi
+
+  if [[ -f "${APPLICATION_IMAGES_LOCK_FILE}" ]] && [[ -z "$(identity_output_value "${identity_output}" "OURBOX_APPLICATION_IMAGES_LOCK_SHA256")" ]]; then
+    die "platform-contract contract-identity.sh leaves OURBOX_APPLICATION_IMAGES_LOCK_SHA256 empty while application image metadata is present. Rebuild with a compatible platform-contract artifact."
+  fi
 }
 
 resolve_desired_contract_state() {
@@ -44,6 +290,7 @@ resolve_desired_contract_state() {
 current_contract_matches() {
   [[ -f "${MARKER}" ]] || return 1
   [[ -f "${APPLIED_CONTRACT_STATE}" ]] || return 1
+  [[ -f "${SELECTED_APP_SURFACE_STATE}" ]] || return 1
   cmp -s "${APPLIED_CONTRACT_STATE}" "${DESIRED_CONTRACT_STATE}"
 }
 
@@ -59,6 +306,9 @@ mkdir -p \
   "/var/lib/ourbox/secrets" \
   "/var/lib/ourbox/k3s/agent/images"
 
+load_platform_profile_input
+require_application_intent_files
+require_platform_contract_capabilities
 resolve_desired_contract_state
 
 if current_contract_matches; then
@@ -182,14 +432,24 @@ fi
 
 log "Rendering upstream platform contract"
 rm -rf "${RENDER_DIR}"
-python3 "${PLATFORM_CONTRACT_DIR}/tools/render-contract.py" \
-  --contract-root "${PLATFORM_CONTRACT_DIR}" \
-  --output-dir "${RENDER_DIR}" \
-  --profile "${PLATFORM_PROFILE_INPUT}" \
-  --box-host "${BOX_HOST}" \
-  --tls-mode "${TLS_MODE}" \
-  --ingress-class "${INGRESS_CLASS}" \
+render_cmd=(
+  python3 "${PLATFORM_CONTRACT_DIR}/tools/render-contract.py"
+  --contract-root "${PLATFORM_CONTRACT_DIR}"
+  --output-dir "${RENDER_DIR}"
+  --profile "${PLATFORM_PROFILE_INPUT}"
+  --selected-apps-file "${SELECTED_APPS_FILE}"
+  --application-catalog "${APPLICATION_CATALOG_FILE}"
+  --images-lock-file "${APPLICATION_IMAGES_LOCK_FILE}"
+  --platform-images-lock-file "${PLATFORM_IMAGES_LOCK_FILE}"
+  --box-host "${BOX_HOST}"
+  --tls-mode "${TLS_MODE}"
+  --ingress-class "${INGRESS_CLASS}"
   --storage-class "${STORAGE_CLASS}"
+)
+log "Applying mission-selected application metadata from ${APPLICATION_CATALOG_FILE}, ${SELECTED_APPS_FILE}, ${APPLICATION_IMAGES_LOCK_FILE}, and ${PLATFORM_IMAGES_LOCK_FILE}"
+"${render_cmd[@]}"
+[[ -f "${RENDER_DIR}/selected-app-surface.json" ]] || \
+  die "rendered platform contract is missing selected-app-surface.json"
 
 log "Applying rendered platform manifests"
 kubectl_cmd apply -f "${RENDER_DIR}/manifests"
@@ -201,5 +461,7 @@ log "Running upstream runtime verification"
   --render-dir "${RENDER_DIR}"
 
 install -D -m 0644 "${DESIRED_CONTRACT_STATE}" "${APPLIED_CONTRACT_STATE}"
+install -D -m 0644 "${RENDER_DIR}/selected-app-surface.json" "${SELECTED_APP_SURFACE_STATE}"
 date -Is > "$MARKER"
+systemctl restart ourbox-mdns-aliases.service ourbox-status.service || true
 echo "OurBox bootstrap complete. device_id=${DEVICE_ID}"
